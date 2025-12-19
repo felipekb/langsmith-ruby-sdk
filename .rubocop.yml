@@ -1,0 +1,120 @@
+# RuboCop configuration for langsmith-sdk-ruby
+# Run: bundle exec rubocop
+
+plugins:
+  - rubocop-rspec
+
+AllCops:
+  TargetRubyVersion: 3.1
+  NewCops: enable
+  SuggestExtensions: false
+  Exclude:
+    - 'vendor/**/*'
+    - 'examples/**/*'
+    - '*.gemspec'
+
+# Layout
+Layout/LineLength:
+  Max: 120
+  AllowedPatterns:
+    - '^\s*#'  # Allow long comments
+
+Layout/EmptyLinesAroundClassBody:
+  Enabled: false
+
+Layout/EmptyLinesAroundModuleBody:
+  Enabled: false
+
+# Metrics
+Metrics/MethodLength:
+  Max: 25
+  Exclude:
+    - 'spec/**/*'
+
+Metrics/BlockLength:
+  Exclude:
+    - 'spec/**/*'
+    - 'Rakefile'
+
+Metrics/ClassLength:
+  Max: 200
+
+Metrics/AbcSize:
+  Max: 32
+
+Metrics/CyclomaticComplexity:
+  Max: 12
+
+Metrics/PerceivedComplexity:
+  Max: 12
+
+# Data classes and API methods often need many parameters
+# Run.new needs all trace attributes, trace() accepts many options
+Metrics/ParameterLists:
+  Max: 8
+  CountKeywordArgs: false  # Keyword args are self-documenting, less problematic
+
+# Style
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: true
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/StringLiteralsInInterpolation:
+  EnforcedStyle: double_quotes
+
+Style/TrailingCommaInHashLiteral:
+  Enabled: false
+
+Style/TrailingCommaInArrayLiteral:
+  Enabled: false
+
+Style/TrailingCommaInArguments:
+  Enabled: false
+
+# Naming
+Naming/MethodParameterName:
+  AllowedNames:
+    - id
+    - e
+
+# Renamed from PredicateName in newer rubocop
+Naming/PredicatePrefix:
+  Enabled: false
+
+# Allow set_ prefix for explicit setter methods (set_inputs, set_outputs, set_token_usage)
+# These are intentionally named to be explicit about mutation vs simple assignment
+Naming/AccessorMethodName:
+  Enabled: false
+
+# RSpec
+RSpec/MultipleExpectations:
+  Max: 6
+
+RSpec/ExampleLength:
+  Max: 15
+
+RSpec/NestedGroups:
+  Max: 4
+
+RSpec/DescribeClass:
+  Exclude:
+    - 'spec/langsmith_spec.rb'
+
+RSpec/MessageSpies:
+  EnforcedStyle: have_received
+
+RSpec/VerifiedDoubles:
+  Enabled: true
+
+# Numbered let names like run1, run2 are clear in batch processing tests
+RSpec/IndexedLet:
+  Enabled: false
+
+# receive_messages is often less readable than separate stubs
+RSpec/ReceiveMessages:
+  Enabled: false
