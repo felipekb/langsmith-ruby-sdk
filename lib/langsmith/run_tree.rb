@@ -17,13 +17,18 @@ module Langsmith
       tags: nil,
       extra: nil,
       parent_run_id: nil,
-      tenant_id: nil
+      tenant_id: nil,
+      project: nil
     )
       # If no explicit parent, check context for current parent
       effective_parent_id = parent_run_id || Context.current_parent_run_id
 
       # Inherit tenant_id from parent run if not explicitly set
       effective_tenant_id = tenant_id || Context.current_run&.tenant_id
+
+      # Child traces must use the same project as their parent to keep the trace tree together.
+      # Only root traces can set the project; children always inherit from parent.
+      effective_project = Context.current_run&.session_name || project
 
       # Inherit trace_id from root run (parent's trace_id)
       # For root runs, trace_id will default to the run's own ID
@@ -41,6 +46,7 @@ module Langsmith
         tags: tags,
         extra: extra,
         tenant_id: effective_tenant_id,
+        session_name: effective_project,
         trace_id: effective_trace_id,
         parent_dotted_order: parent_dotted_order
       )

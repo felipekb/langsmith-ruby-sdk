@@ -109,6 +109,23 @@ Supported run types:
 - `"prompt"` - Prompt template rendering
 - `"parser"` - Output parsing operations
 
+## Per-Trace Project Override
+
+You can override the project for specific traces at runtime:
+
+```ruby
+# Override project for a specific trace (and its children)
+Langsmith.trace("operation", project: "my-special-project") do
+  # This trace goes to "my-special-project"
+
+  # Nested traces inherit project from parent automatically
+  Langsmith.trace("child") do
+    # Also goes to "my-special-project"
+  end
+end
+```
+
+
 ## Multi-Tenant Support
 
 For multi-tenant scenarios, you can set a global tenant ID or override it per-trace:
@@ -195,6 +212,7 @@ See [`examples/LLM_TRACING.md`](examples/LLM_TRACING.md) for comprehensive examp
 - OpenAI and Anthropic integrations
 - Error handling and retries
 - Multi-tenant tracing
+- Per-trace project overrides
 
 ## Development
 

@@ -69,6 +69,7 @@ module Langsmith
     # @param tags [Array<String>] Tags for filtering
     # @param extra [Hash] Extra data (e.g., token usage)
     # @param tenant_id [String] Tenant ID for multi-tenant scenarios (overrides global config)
+    # @param project [String] Project name for this trace (overrides global config)
     #
     # @example Basic tracing
     #   Langsmith.trace("my_operation", run_type: "chain") do |run|
@@ -89,9 +90,15 @@ module Langsmith
     #     # This trace goes to tenant-123
     #   end
     #
+    # @example Project-specific tracing
+    #   Langsmith.trace("operation", project: "my-special-project") do |run|
+    #     # This trace goes to my-special-project
+    #   end
+    #
     # @yield [Run] the run object for adding metadata, events, etc.
     # @return [Object] the return value of the block
-    def trace(name, run_type: "chain", inputs: nil, metadata: nil, tags: nil, extra: nil, tenant_id: nil, &block)
+    def trace(name, run_type: "chain", inputs: nil, metadata: nil, tags: nil, extra: nil, tenant_id: nil, project: nil,
+              &block)
       run_tree = RunTree.new(
         name: name,
         run_type: run_type,
@@ -99,7 +106,8 @@ module Langsmith
         metadata: metadata,
         tags: tags,
         extra: extra,
-        tenant_id: tenant_id
+        tenant_id: tenant_id,
+        project: project
       )
 
       run_tree.execute(&block)
