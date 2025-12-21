@@ -111,7 +111,7 @@ RSpec.describe Langsmith::Run do
     it "sets token usage in extra.metadata.usage_metadata" do
       run.set_token_usage(input_tokens: 10, output_tokens: 20)
 
-      usage = run.extra.dig("metadata", "usage_metadata")
+      usage = run.extra.dig(:metadata, :usage_metadata)
       expect(usage[:input_tokens]).to eq(10)
       expect(usage[:output_tokens]).to eq(20)
       expect(usage[:total_tokens]).to eq(30)
@@ -120,7 +120,7 @@ RSpec.describe Langsmith::Run do
     it "allows explicit total_tokens" do
       run.set_token_usage(input_tokens: 10, output_tokens: 20, total_tokens: 35)
 
-      usage = run.extra.dig("metadata", "usage_metadata")
+      usage = run.extra.dig(:metadata, :usage_metadata)
       expect(usage[:total_tokens]).to eq(35)
     end
 
@@ -128,9 +128,9 @@ RSpec.describe Langsmith::Run do
       run.set_token_usage(input_tokens: 100, output_tokens: 50)
 
       hash = run.to_h
-      expect(hash[:extra]["metadata"]["usage_metadata"][:input_tokens]).to eq(100)
-      expect(hash[:extra]["metadata"]["usage_metadata"][:output_tokens]).to eq(50)
-      expect(hash[:extra]["metadata"]["usage_metadata"][:total_tokens]).to eq(150)
+      expect(hash[:extra][:metadata][:usage_metadata][:input_tokens]).to eq(100)
+      expect(hash[:extra][:metadata][:usage_metadata][:output_tokens]).to eq(50)
+      expect(hash[:extra][:metadata][:usage_metadata][:total_tokens]).to eq(150)
     end
 
     it "returns nil to prevent circular reference" do
@@ -145,15 +145,15 @@ RSpec.describe Langsmith::Run do
     it "sets model info in extra.metadata" do
       run.set_model(model: "gpt-4o-mini", provider: "openai")
 
-      expect(run.extra.dig("metadata", "ls_model_name")).to eq("gpt-4o-mini")
-      expect(run.extra.dig("metadata", "ls_provider")).to eq("openai")
+      expect(run.extra.dig(:metadata, :ls_model_name)).to eq("gpt-4o-mini")
+      expect(run.extra.dig(:metadata, :ls_provider)).to eq("openai")
     end
 
     it "sets model without provider" do
       run.set_model(model: "claude-3-sonnet")
 
-      expect(run.extra.dig("metadata", "ls_model_name")).to eq("claude-3-sonnet")
-      expect(run.extra.dig("metadata", "ls_provider")).to be_nil
+      expect(run.extra.dig(:metadata, :ls_model_name)).to eq("claude-3-sonnet")
+      expect(run.extra.dig(:metadata, :ls_provider)).to be_nil
     end
 
     it "returns nil to prevent circular reference" do
@@ -172,7 +172,7 @@ RSpec.describe Langsmith::Run do
         tokens_per_second: 85.5
       )
 
-      metrics = run.extra.dig("metadata", "streaming_metrics")
+      metrics = run.extra.dig(:metadata, :streaming_metrics)
       expect(metrics[:time_to_first_token_s]).to eq(0.235)
       expect(metrics[:chunk_count]).to eq(42)
       expect(metrics[:tokens_per_second]).to eq(85.5)
@@ -181,7 +181,7 @@ RSpec.describe Langsmith::Run do
     it "accepts partial metrics" do
       run.set_streaming_metrics(time_to_first_token: 0.5)
 
-      metrics = run.extra.dig("metadata", "streaming_metrics")
+      metrics = run.extra.dig(:metadata, :streaming_metrics)
       expect(metrics[:time_to_first_token_s]).to eq(0.5)
       expect(metrics[:chunk_count]).to be_nil
     end

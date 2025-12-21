@@ -16,7 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Method decoration with `Langsmith::Traceable` module
 - Automatic parent-child trace linking for nested traces
 - Thread-safe batch processing with background worker
-- Fiber-local context support for Ruby 3.2+ async frameworks
+- Thread-local context for proper isolation in concurrent environments
 - Multi-tenant support with per-trace `tenant_id` override
 - Token usage tracking with `set_token_usage`
 - Model metadata with `set_model`

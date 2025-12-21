@@ -131,3 +131,6 @@ module Langsmith
     end
   end
 end
+
+# Load Rails integration if Rails is available
+require_relative "langsmith/railtie" if defined?(Rails::Railtie)

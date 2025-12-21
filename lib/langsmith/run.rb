@@ -174,8 +174,8 @@ module Langsmith
     def set_token_usage(input_tokens: nil, output_tokens: nil, total_tokens: nil)
       calculated_total = total_tokens || ((input_tokens || 0) + (output_tokens || 0))
 
-      @extra["metadata"] ||= {}
-      @extra["metadata"]["usage_metadata"] = {
+      @extra[:metadata] ||= {}
+      @extra[:metadata][:usage_metadata] = {
         input_tokens: input_tokens,
         output_tokens: output_tokens,
         total_tokens: calculated_total
@@ -191,9 +191,9 @@ module Langsmith
     # @param provider [String, nil] the model provider (e.g., "openai", "anthropic")
     # @return [nil] returns nil to prevent circular reference when used as last line
     def set_model(model:, provider: nil)
-      @extra["metadata"] ||= {}
-      @extra["metadata"]["ls_model_name"] = model
-      @extra["metadata"]["ls_provider"] = provider if provider
+      @extra[:metadata] ||= {}
+      @extra[:metadata][:ls_model_name] = model
+      @extra[:metadata][:ls_provider] = provider if provider
       nil
     end
 
@@ -205,8 +205,8 @@ module Langsmith
     # @param tokens_per_second [Float, nil] throughput in tokens per second
     # @return [nil] returns nil to prevent circular reference when used as last line
     def set_streaming_metrics(time_to_first_token: nil, chunk_count: nil, tokens_per_second: nil)
-      @extra["metadata"] ||= {}
-      @extra["metadata"]["streaming_metrics"] = {
+      @extra[:metadata] ||= {}
+      @extra[:metadata][:streaming_metrics] = {
         time_to_first_token_s: time_to_first_token,
         chunk_count: chunk_count,
         tokens_per_second: tokens_per_second
@@ -258,6 +258,7 @@ module Langsmith
     # Convert to hash for PATCH requests (only fields that change on completion).
     # Note: parent_run_id is required for LangSmith to validate dotted_order correctly.
     # Token usage is included in extra.metadata.usage_metadata.
+    # Metadata and tags are included as they may be added during execution.
     #
     # @return [Hash]
     def to_update_h
@@ -270,7 +271,9 @@ module Langsmith
         outputs:,
         error:,
         events: events.empty? ? nil : events,
-        extra: extra.empty? ? nil : extra
+        extra: extra.empty? ? nil : extra,
+        tags: tags.empty? ? nil : tags,
+        **(metadata.empty? ? {} : { metadata: })
       }.compact
     end
 

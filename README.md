@@ -168,18 +168,18 @@ Track token usage for LLM calls:
 Langsmith.trace("openai_call", run_type: "llm") do |run|
   response = openai_client.chat(parameters: { model: "gpt-4", messages: messages })
 
+  # Set model info (displayed in LangSmith UI)
+  run.set_model(model: "gpt-4", provider: "openai")
+
   # Set token usage from API response
   run.set_token_usage(
-    prompt_tokens: response["usage"]["prompt_tokens"],
-    completion_tokens: response["usage"]["completion_tokens"],
+    input_tokens: response["usage"]["prompt_tokens"],
+    output_tokens: response["usage"]["completion_tokens"],
     total_tokens: response["usage"]["total_tokens"]
   )
 
-  # Add model metadata
-  run.add_metadata(
-    model: "gpt-4",
-    finish_reason: response.dig("choices", 0, "finish_reason")
-  )
+  # Add additional metadata
+  run.add_metadata(finish_reason: response.dig("choices", 0, "finish_reason"))
 
   response.dig("choices", 0, "message", "content")
 end

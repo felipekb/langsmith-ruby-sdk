@@ -76,6 +76,11 @@ module Langsmith
     private
 
     def enqueue(type, run)
+      unless run.is_a?(Run)
+        log_error("enqueue expects a Run instance, got #{run.class}")
+        return
+      end
+
       ensure_started
       # Use to_h for creates (full data), to_update_h for updates (minimal PATCH payload)
       run_data = type == CREATE ? run.to_h : run.to_update_h

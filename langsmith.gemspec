@@ -33,5 +33,6 @@ Gem::Specification.new do |spec|
   # Runtime dependencies
   spec.add_dependency "concurrent-ruby", ">= 1.1", "< 3.0"
   spec.add_dependency "faraday", "~> 2.0"
+  spec.add_dependency "faraday-net_http_persistent", "~> 2.0"
   spec.add_dependency "faraday-retry", "~> 2.0"
 end

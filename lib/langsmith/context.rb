@@ -1,37 +1,24 @@
 # frozen_string_literal: true
 
 module Langsmith
-  # Thread/Fiber-local context manager for maintaining the current trace stack.
+  # Thread-local context manager for maintaining the current trace stack.
   # This allows nested traces to automatically link to their parent runs.
   #
-  # Each thread/fiber maintains its own trace stack, ensuring proper isolation
-  # in concurrent environments. Uses Fiber.current storage when available (Ruby 3.2+)
-  # to properly support async frameworks like Async, Falcon, etc.
+  # Each thread maintains its own trace stack, ensuring proper isolation
+  # in concurrent environments.
+  #
+  # Note: We use Thread.current instead of Fiber.storage for compatibility
+  # across Ruby versions. Fiber.storage behavior differs between Ruby versions
+  # and caused test failures on Ruby 3.2.
   module Context
     CONTEXT_KEY = :langsmith_run_stack
     private_constant :CONTEXT_KEY
 
     class << self
-      # Returns the current run stack for this thread/fiber.
-      # Uses Fiber-local storage when available (Ruby 3.2+) for better
-      # compatibility with async frameworks.
+      # Returns the current run stack for this thread.
       def run_stack
-        storage[CONTEXT_KEY] ||= []
+        Thread.current[CONTEXT_KEY] ||= []
       end
-
-      private
-
-      # Returns the appropriate storage mechanism.
-      # Ruby 3.2+ has Fiber#storage for fiber-local variables.
-      def storage
-        if Fiber.current.respond_to?(:storage)
-          Fiber.current.storage
-        else
-          Thread.current
-        end
-      end
-
-      public
 
       # Returns the current (topmost) run, or nil if no active trace
       def current_run
@@ -64,7 +51,7 @@ module Langsmith
 
       # Clear the entire run stack (useful for testing)
       def clear!
-        storage[CONTEXT_KEY] = []
+        Thread.current[CONTEXT_KEY] = []
       end
 
       # Check if there's an active trace context
