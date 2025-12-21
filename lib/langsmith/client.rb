@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "faraday"
+require "faraday/net_http_persistent"
 require "faraday/retry"
 require "json"
 
@@ -126,7 +127,7 @@ module Langsmith
         f.options.timeout = @timeout
         f.options.open_timeout = @timeout
 
-        f.adapter Faraday.default_adapter
+        f.adapter :net_http_persistent
       end
     end
 
