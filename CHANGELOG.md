@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] - 2025-12-21
+
+### Added
+
+- Per-trace `project` parameter to override the default project at runtime
+- Child traces automatically inherit project from parent (enforced)
+
 ## [0.1.0] - 2025-12-21
 
 ### Added
@@ -35,6 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `prompt` - Prompt template rendering
 - `parser` - Output parsing operations
 
-[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/felipekb/langsmith-ruby-sdk/releases/tag/v0.1.0
 
