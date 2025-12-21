@@ -2,7 +2,7 @@
 
 RSpec.describe Langsmith do
   before do
-    # Note: reset_configuration! is also called in spec_helper.rb
+    # NOTE: reset_configuration! is also called in spec_helper.rb
     # but we call it here explicitly along with Context.clear! for test isolation
     Langsmith::Context.clear!
   end

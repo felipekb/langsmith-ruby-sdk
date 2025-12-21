@@ -49,11 +49,9 @@ module Langsmith
       @queue << { type: SHUTDOWN }
 
       worker = @worker_thread.get
-      if worker&.alive?
+      if worker&.alive? && !worker.join(5)
         # Give the worker time to drain the queue gracefully
-        unless worker.join(5)
-          log_error("Worker thread did not terminate within timeout", force: true)
-        end
+        log_error("Worker thread did not terminate within timeout", force: true)
       end
 
       flush_pending
