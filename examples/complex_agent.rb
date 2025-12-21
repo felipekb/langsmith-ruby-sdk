@@ -152,27 +152,21 @@ end
 # =============================================================================
 
 class ResearchAgent
-  include Langsmith::Traceable
-
   def initialize
     @conversation_history = []
   end
 
-  traceable run_type: "chain", name: "research_agent.run"
   def run(user_query)
-    @conversation_history << { role: "user", content: user_query }
+    Langsmith.trace("research_agent.run", run_type: "chain", inputs: { query: user_query }) do
+      @conversation_history << { role: "user", content: user_query }
 
-    # Step 1: Analyze the query and plan
-    plan = plan_execution(user_query)
+      plan = plan_execution(user_query)
+      results = execute_plan(plan)
+      response = synthesize_response(user_query, results)
 
-    # Step 2: Execute the plan
-    results = execute_plan(plan)
-
-    # Step 3: Synthesize final response
-    response = synthesize_response(user_query, results)
-
-    @conversation_history << { role: "assistant", content: response }
-    response
+      @conversation_history << { role: "assistant", content: response }
+      response
+    end
   end
 
   private

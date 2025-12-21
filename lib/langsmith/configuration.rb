@@ -42,6 +42,9 @@ module Langsmith
     # @return [String, nil] Tenant ID for multi-tenant scenarios
     attr_accessor :tenant_id
 
+    # @return [Integer, nil] Maximum buffered run entries (queue + pending); nil means unlimited
+    attr_accessor :max_pending_entries
+
     def initialize
       @api_key = ENV.fetch("LANGSMITH_API_KEY", nil)
       @endpoint = ENV.fetch("LANGSMITH_ENDPOINT", "https://api.smith.langchain.com")
@@ -52,6 +55,7 @@ module Langsmith
       @timeout = ENV.fetch("LANGSMITH_TIMEOUT", 10).to_i
       @max_retries = ENV.fetch("LANGSMITH_MAX_RETRIES", 3).to_i
       @tenant_id = ENV.fetch("LANGSMITH_TENANT_ID", nil)
+      @max_pending_entries = ENV.fetch("LANGSMITH_MAX_PENDING_ENTRIES", nil)&.to_i
     end
 
     # Returns whether tracing is enabled in configuration.

@@ -8,7 +8,6 @@ require_relative "langsmith/context"
 require_relative "langsmith/client"
 require_relative "langsmith/batch_processor"
 require_relative "langsmith/run_tree"
-require_relative "langsmith/traceable"
 
 module Langsmith
   class << self

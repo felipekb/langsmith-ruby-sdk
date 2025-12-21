@@ -416,55 +416,49 @@ end
 
 # Example: RAG chain with OpenAI
 class RAGChain
-  include Langsmith::Traceable
-
   def initialize(knowledge_base:)
     @knowledge_base = knowledge_base
   end
 
-  traceable run_type: "chain", name: "rag_chain"
   def answer(question)
-    # Step 1: Embed the question
-    question_embedding = embed_query(question)
+    Langsmith.trace("rag_chain", run_type: "chain", inputs: { question: question }) do
+      question_embedding = embed_query(question)
 
-    # Step 2: Retrieve relevant context
-    context = retrieve_context(question_embedding)
+      context = retrieve_context(question_embedding)
 
-    # Step 3: Generate answer
-    generate_answer(question, context)
+      generate_answer(question, context)
+    end
   end
 
   private
 
-  traceable run_type: "llm", name: "embed_query"
   def embed_query(text)
-    response = TracedOpenAI.embed(input: text)
-    response.dig("data", 0, "embedding")
+    Langsmith.trace("embed_query", run_type: "llm", inputs: { text: text[0..50] }) do
+      response = TracedOpenAI.embed(input: text)
+      response.dig("data", 0, "embedding")
+    end
   end
 
-  traceable run_type: "retriever", name: "retrieve_context"
   def retrieve_context(embedding)
-    # Simulate vector search - in real app, query your vector DB
-    Langsmith.current_run&.add_metadata(
-      index: "knowledge_base",
-      top_k: 3
-    )
-
-    @knowledge_base.first(3)
+    Langsmith.trace("retrieve_context", run_type: "retriever", inputs: { top_k: 3 }) do |run|
+      run.add_metadata(index: "knowledge_base", top_k: 3)
+      @knowledge_base.first(3)
+    end
   end
 
-  traceable run_type: "llm", name: "generate_answer"
   def generate_answer(question, context)
-    messages = [
-      {
-        role: "system",
-        content: "Answer the question based on the following context:\n\n#{context.join("\n\n")}"
-      },
-      { role: "user", content: question }
-    ]
+    Langsmith.trace("generate_answer", run_type: "llm", inputs: { question: question }) do
+      messages = [
+        {
+          role: "system",
+          content: "Answer the question based on the following context:\n\n#{context.join("\n\n")}"
+        },
+        { role: "user", content: question }
+      ]
 
-    response = TracedOpenAI.chat(messages: messages, model: "gpt-4o-mini")
-    response.dig("choices", 0, "message", "content")
+      response = TracedOpenAI.chat(messages: messages, model: "gpt-4o-mini")
+      response.dig("choices", 0, "message", "content")
+    end
   end
 end
 

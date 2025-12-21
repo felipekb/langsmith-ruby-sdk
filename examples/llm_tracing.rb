@@ -148,22 +148,17 @@ def trace_llm_chain(user_question)
   end
 end
 
-# Example 4: Using Traceable module for LLM service class
+# Example 4: Class-based tracing
 class LLMService
-  include Langsmith::Traceable
-
   def initialize(model: "gpt-4", temperature: 0.7)
     @model = model
     @temperature = temperature
   end
 
-  traceable run_type: "llm", name: "llm_service.chat"
   def chat(messages)
-    # In real code: response = @client.chat.completions.create(...)
-    response = simulate_openai_response(messages, @model)
+    Langsmith.trace("llm_service.chat", run_type: "llm", inputs: { messages: messages.length }) do |run|
+      response = simulate_openai_response(messages, @model)
 
-    # Access current run to set model and token usage (Python SDK pattern)
-    if (run = Langsmith.current_run)
       run.set_model(model: @model, provider: "openai")
       run.set_token_usage(
         input_tokens: response[:usage][:prompt_tokens],
@@ -171,24 +166,21 @@ class LLMService
         total_tokens: response[:usage][:total_tokens]
       )
       run.add_metadata(temperature: @temperature)
-    end
 
-    response[:choices].first[:message][:content]
+      response[:choices].first[:message][:content]
+    end
   end
 
-  traceable run_type: "llm", name: "llm_service.embed"
   def embed(text)
-    # Simulate embedding call
-    tokens_used = (text.length / 4.0).ceil
+    Langsmith.trace("llm_service.embed", run_type: "llm", inputs: { text_preview: text[0..30] }) do |run|
+      tokens_used = (text.length / 4.0).ceil
 
-    if (run = Langsmith.current_run)
       run.set_model(model: "text-embedding-3-small", provider: "openai")
-      # Embeddings only have input tokens, no output tokens
       run.set_token_usage(input_tokens: tokens_used)
       run.add_metadata(dimensions: 1536)
-    end
 
-    Array.new(1536) { rand(-1.0..1.0) }
+      Array.new(1536) { rand(-1.0..1.0) }
+    end
   end
 end
 
@@ -284,7 +276,7 @@ if __FILE__ == $PROGRAM_NAME
   result = trace_llm_chain("How do I trace LLM calls?")
   puts "   Response: #{result}"
 
-  puts "\n4. Using Traceable module:"
+  puts "\n4. Class-based tracing:"
   service = LLMService.new(model: "gpt-4", temperature: 0.5)
   result = service.chat([{ role: "user", content: "Hello!" }])
   puts "   Chat response: #{result}"

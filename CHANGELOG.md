@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-12-21
+
+### Added
+
+- `max_pending_entries` configuration option to limit buffer size and prevent unbounded memory growth
+- Configurable via `LANGSMITH_MAX_PENDING_ENTRIES` environment variable
+
+### Changed
+
+- Improved BatchProcessor thread safety with dedicated mutexes for pending arrays and flush operations
+- Better error logging in BatchProcessor with stack traces for debugging
+- Run data is now serialized on the calling thread to ensure correct state capture
+
+### Removed
+
+- **BREAKING**: Removed `Langsmith::Traceable` module - use `Langsmith.trace` block-based API instead
+
 ## [0.1.1] - 2025-12-21
 
 ### Added
@@ -20,7 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Initial release of the LangSmith Ruby SDK
 - Block-based tracing with `Langsmith.trace`
-- Method decoration with `Langsmith::Traceable` module
 - Automatic parent-child trace linking for nested traces
 - Thread-safe batch processing with background worker
 - Thread-local context for proper isolation in concurrent environments
@@ -42,7 +58,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `prompt` - Prompt template rendering
 - `parser` - Output parsing operations
 
-[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/felipekb/langsmith-ruby-sdk/releases/tag/v0.1.0
 

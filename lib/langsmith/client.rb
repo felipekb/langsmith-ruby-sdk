@@ -66,29 +66,6 @@ module Langsmith
       patch("/runs/#{run.id}", run.to_h, tenant_id: run.tenant_id)
     end
 
-    # Batch create/update runs.
-    # All runs in a batch should have the same tenant_id for optimal performance.
-    #
-    # @param post_runs [Array<Run>] runs to create
-    # @param patch_runs [Array<Run>] runs to update
-    # @param tenant_id [String, nil] tenant ID (inferred from runs if not provided)
-    # @return [Hash, nil] API response
-    # @raise [APIError] if the request fails
-    def batch_ingest(post_runs: [], patch_runs: [], tenant_id: nil)
-      return if post_runs.empty? && patch_runs.empty?
-
-      payload = {}
-      payload[:post] = post_runs.map(&:to_h) unless post_runs.empty?
-      payload[:patch] = patch_runs.map(&:to_h) unless patch_runs.empty?
-
-      # Use tenant_id from first run if not explicitly provided
-      effective_tenant_id = tenant_id ||
-                            post_runs.first&.tenant_id ||
-                            patch_runs.first&.tenant_id
-
-      post("/runs/batch", payload, tenant_id: effective_tenant_id)
-    end
-
     # Batch create/update runs using pre-serialized hashes.
     # Used by BatchProcessor which snapshots run data at enqueue time.
     #
@@ -97,7 +74,7 @@ module Langsmith
     # @param tenant_id [String, nil] tenant ID for the request
     # @return [Hash, nil] API response
     # @raise [APIError] if the request fails
-    def batch_ingest_raw(post_runs: [], patch_runs: [], tenant_id: nil)
+    def batch_ingest(post_runs: [], patch_runs: [], tenant_id: nil)
       return if post_runs.empty? && patch_runs.empty?
 
       payload = {}

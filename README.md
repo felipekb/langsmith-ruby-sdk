@@ -79,26 +79,6 @@ Langsmith.trace("parent_chain", run_type: "chain") do
 end
 ```
 
-### Method Decoration with Traceable
-
-```ruby
-class MyService
-  include Langsmith::Traceable
-
-  traceable run_type: "chain"
-  def process(input)
-    # This method is automatically traced
-    transform(input)
-  end
-
-  traceable run_type: "llm", name: "openai_call"
-  def call_llm(prompt)
-    # Traced with custom name
-    client.chat(prompt)
-  end
-end
-```
-
 ## Run Types
 
 Supported run types:
@@ -153,24 +133,6 @@ Langsmith.trace("operation", tenant_id: "tenant-456") do
   # Nested traces inherit tenant_id from parent
   Langsmith.trace("child") do
     # Also goes to tenant-456
-  end
-end
-```
-
-### With Traceable Module
-
-```ruby
-class MultiTenantService
-  include Langsmith::Traceable
-
-  traceable run_type: "chain", tenant_id: "tenant-123"
-  def process_for_tenant_123(data)
-    # Always traced to tenant-123
-  end
-
-  traceable run_type: "chain", tenant_id: "tenant-456"
-  def process_for_tenant_456(data)
-    # Always traced to tenant-456
   end
 end
 ```

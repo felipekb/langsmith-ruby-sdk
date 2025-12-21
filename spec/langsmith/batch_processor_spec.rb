@@ -5,7 +5,7 @@ RSpec.describe Langsmith::BatchProcessor do
   let(:processor) { described_class.new(client: client, batch_size: 5, flush_interval: 0.05) }
 
   before do
-    allow(client).to receive(:batch_ingest_raw)
+    allow(client).to receive(:batch_ingest)
   end
 
   after do
@@ -41,7 +41,7 @@ RSpec.describe Langsmith::BatchProcessor do
 
       processor.shutdown
 
-      expect(client).to have_received(:batch_ingest_raw).at_least(:once)
+      expect(client).to have_received(:batch_ingest).at_least(:once)
     end
 
     it "stops the worker thread" do
@@ -62,7 +62,7 @@ RSpec.describe Langsmith::BatchProcessor do
 
       processor.shutdown
 
-      expect(client).to have_received(:batch_ingest_raw).at_least(:once)
+      expect(client).to have_received(:batch_ingest).at_least(:once)
     end
   end
 
@@ -74,14 +74,14 @@ RSpec.describe Langsmith::BatchProcessor do
 
       processor.shutdown
 
-      expect(client).to have_received(:batch_ingest_raw).at_least(:once)
+      expect(client).to have_received(:batch_ingest).at_least(:once)
     end
   end
 
   describe "error handling" do
     it "continues processing after API errors" do
       call_count = 0
-      allow(client).to receive(:batch_ingest_raw) do
+      allow(client).to receive(:batch_ingest) do
         call_count += 1
         raise Langsmith::Client::APIError, "test error" if call_count == 1
       end
@@ -94,6 +94,38 @@ RSpec.describe Langsmith::BatchProcessor do
 
       # Should not raise even with API error
       expect { processor.shutdown }.not_to raise_error
+    end
+  end
+
+  describe "#flush" do
+    it "drains queued items and sends them immediately" do
+      run = Langsmith::Run.new(name: "flush_test")
+      processor.enqueue_create(run)
+
+      processor.flush
+
+      expect(client).to have_received(:batch_ingest).with(
+        post_runs: array_including(hash_including(name: "flush_test")),
+        patch_runs: [],
+        tenant_id: nil
+      )
+    end
+
+    it "requeues failed batches and retries on next flush" do
+      call_count = 0
+      allow(client).to receive(:batch_ingest) do
+        call_count += 1
+        raise Langsmith::Client::APIError, "temporary failure" if call_count == 1
+      end
+
+      run = Langsmith::Run.new(name: "retry_test")
+      processor.enqueue_create(run)
+
+      expect { processor.flush }.not_to raise_error
+      expect { processor.flush }.not_to raise_error
+
+      expect(call_count).to be >= 2
+      expect(client).to have_received(:batch_ingest).at_least(:twice)
     end
   end
 
@@ -110,7 +142,34 @@ RSpec.describe Langsmith::BatchProcessor do
       processor.shutdown
 
       # Should receive at least 2 calls (one per tenant)
-      expect(client).to have_received(:batch_ingest_raw).at_least(:twice)
+      expect(client).to have_received(:batch_ingest).at_least(:twice)
+    end
+  end
+
+  describe "buffer cap" do
+    it "drops oldest entries when exceeding max_pending_entries" do
+      capped_processor = described_class.new(client: client, batch_size: 5, flush_interval: 0.05, max_pending_entries: 1)
+      allow(client).to receive(:batch_ingest)
+
+      run1 = Langsmith::Run.new(name: "old")
+      run2 = Langsmith::Run.new(name: "new")
+
+      capped_processor.enqueue_create(run1)
+      capped_processor.enqueue_create(run2)
+
+      capped_processor.flush
+      capped_processor.shutdown
+
+      expect(client).to have_received(:batch_ingest).with(
+        post_runs: array_including(hash_including(name: "new")),
+        patch_runs: [],
+        tenant_id: nil
+      )
+      expect(client).not_to have_received(:batch_ingest).with(
+        post_runs: array_including(hash_including(name: "old")),
+        patch_runs: [],
+        tenant_id: nil
+      )
     end
   end
 end
