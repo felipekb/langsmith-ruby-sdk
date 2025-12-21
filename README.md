@@ -216,7 +216,7 @@ See [`examples/LLM_TRACING.md`](examples/LLM_TRACING.md) for comprehensive examp
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests.
+After checking out the repo, run `bundle install` to install dependencies. Then, run `bundle exec rspec` to run the tests.
 
 ## License
 
