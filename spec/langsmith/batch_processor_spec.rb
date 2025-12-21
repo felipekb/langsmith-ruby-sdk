@@ -147,8 +147,9 @@ RSpec.describe Langsmith::BatchProcessor do
   end
 
   describe "buffer cap" do
-    it "drops oldest entries when exceeding max_pending_entries" do
-      capped_processor = described_class.new(client: client, batch_size: 5, flush_interval: 0.05, max_pending_entries: 1)
+    it "drops oldest entries when exceeding max_pending_entries" do # rubocop:disable RSpec/ExampleLength
+      capped_processor = described_class.new(client: client, batch_size: 5, flush_interval: 0.05,
+                                             max_pending_entries: 1)
       allow(client).to receive(:batch_ingest)
 
       run1 = Langsmith::Run.new(name: "old")

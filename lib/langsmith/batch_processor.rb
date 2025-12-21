@@ -312,9 +312,7 @@ module Langsmith
     def trim_buffer_if_needed
       return unless @max_pending_entries
 
-      while current_buffer_size > @max_pending_entries
-        drop_one_entry
-      end
+      drop_one_entry while current_buffer_size > @max_pending_entries
     end
 
     def current_buffer_size
@@ -346,7 +344,9 @@ module Langsmith
     def log_dropped(entry)
       return unless ENV["LANGSMITH_DEBUG"]
 
-      log_error("Dropped run entry due to max_pending_entries cap (type: #{entry[:type]}, tenant: #{entry[:tenant_id]})")
+      log_error(
+        "Dropped run entry due to max_pending_entries cap (type: #{entry[:type]}, tenant: #{entry[:tenant_id]})"
+      )
     end
 
     def log_error(message, force: false)
