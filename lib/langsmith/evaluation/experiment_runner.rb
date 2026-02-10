@@ -52,10 +52,14 @@ module Langsmith
       end
 
       def run_example(example, experiment_id)
-        outputs = Context.with_evaluation(experiment_id: experiment_id, example_id: example[:id]) do
-          @block.call(example)
+        outputs = nil
+        run_id = nil
+
+        Context.with_evaluation(experiment_id: experiment_id, example_id: example[:id]) do
+          outputs = @block.call(example)
+          run_id = Context.evaluation_root_run_id
         end
-        run_id = Context.evaluation_root_run_id
+
         feedback = run_evaluators(example, outputs, run_id)
         { example_id: example[:id], run_id: run_id, status: :success, error: nil, feedback: feedback }
       rescue StandardError => e
