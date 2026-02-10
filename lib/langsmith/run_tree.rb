@@ -37,6 +37,13 @@ module Langsmith
       # Inherit dotted_order from parent for proper trace ordering
       parent_dotted_order = Context.current_run&.dotted_order
 
+      # Inject evaluation context when present:
+      # - session_id goes on ALL runs so the entire trace links to the experiment
+      # - reference_example_id goes only on ROOT runs (no parent) per LangSmith API requirement
+      eval_ctx = Context.evaluation_context
+      effective_session_id = eval_ctx&.dig(:experiment_id)
+      effective_ref_example_id = eval_ctx&.dig(:example_id) unless effective_parent_id
+
       @run = Run.new(
         name: name,
         run_type: run_type,
@@ -48,7 +55,9 @@ module Langsmith
         tenant_id: effective_tenant_id,
         session_name: effective_project,
         trace_id: effective_trace_id,
-        parent_dotted_order: parent_dotted_order
+        parent_dotted_order: parent_dotted_order,
+        reference_example_id: effective_ref_example_id,
+        session_id: effective_session_id
       )
 
       @posted_start = false
