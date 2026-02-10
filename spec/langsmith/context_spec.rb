@@ -130,4 +130,70 @@ RSpec.describe Langsmith::Context do
       expect(described_class.current_run).to eq(run1)
     end
   end
+
+  describe ".evaluation_context" do
+    it "returns nil when not in evaluation" do
+      expect(described_class.evaluation_context).to be_nil
+    end
+  end
+
+  describe ".evaluating?" do
+    it "returns false when not in evaluation" do
+      expect(described_class.evaluating?).to be false
+    end
+  end
+
+  describe ".with_evaluation" do
+    it "sets context during block and clears after" do
+      described_class.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        ctx = described_class.evaluation_context
+        expect(ctx[:experiment_id]).to eq("exp-1")
+        expect(ctx[:example_id]).to eq("ex-1")
+        expect(described_class.evaluating?).to be true
+      end
+
+      expect(described_class.evaluation_context).to be_nil
+      expect(described_class.evaluating?).to be false
+    end
+
+    it "clears context even if block raises" do
+      expect do
+        described_class.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+          raise "boom"
+        end
+      end.to raise_error("boom")
+
+      expect(described_class.evaluation_context).to be_nil
+      expect(described_class.evaluating?).to be false
+    end
+  end
+
+  describe "evaluation thread isolation" do
+    it "maintains separate evaluation contexts per thread" do
+      described_class.with_evaluation(experiment_id: "main-exp", example_id: "main-ex") do
+        thread_ctx = nil
+        thread = Thread.new do
+          expect(described_class.evaluating?).to be false
+          described_class.with_evaluation(experiment_id: "t-exp", example_id: "t-ex") do
+            thread_ctx = described_class.evaluation_context
+          end
+        end
+        thread.join
+
+        expect(thread_ctx[:experiment_id]).to eq("t-exp")
+        expect(described_class.evaluation_context[:experiment_id]).to eq("main-exp")
+      end
+    end
+  end
+
+  describe ".clear!" do
+    it "also clears evaluation context" do
+      described_class.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        described_class.clear!
+
+        expect(described_class.evaluation_context).to be_nil
+        expect(described_class.evaluating?).to be false
+      end
+    end
+  end
 end
