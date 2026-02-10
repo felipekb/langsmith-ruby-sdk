@@ -104,6 +104,44 @@ module Langsmith
       handle_response(e.response)
     end
 
+    # List examples from a LangSmith dataset.
+    #
+    # @param dataset_id [String] the dataset ID to fetch examples from
+    # @param tenant_id [String, nil] tenant ID for the request
+    # @return [Array<Hash>] array of example objects
+    # @raise [APIError] if the request fails
+    def list_examples(dataset_id:, tenant_id: nil)
+      get("/api/v1/examples", params: { dataset: dataset_id }, tenant_id: tenant_id)
+    end
+
+    # Create a new experiment (tracer session) linked to a dataset.
+    #
+    # @param name [String] experiment name
+    # @param dataset_id [String] reference dataset ID
+    # @param description [String, nil] optional experiment description
+    # @param metadata [Hash, nil] optional metadata (stored as `extra`)
+    # @param tenant_id [String, nil] tenant ID for the request
+    # @return [Hash] the created experiment object
+    # @raise [APIError] if the request fails
+    def create_experiment(name:, dataset_id:, description: nil, metadata: nil, tenant_id: nil)
+      payload = { name: name, reference_dataset_id: dataset_id }
+      payload[:description] = description if description
+      payload[:extra] = metadata if metadata
+
+      post("/api/v1/sessions", payload, tenant_id: tenant_id)
+    end
+
+    # Close an experiment by setting its end time.
+    #
+    # @param experiment_id [String] the experiment (session) ID
+    # @param end_time [String] ISO-8601 end time
+    # @param tenant_id [String, nil] tenant ID for the request
+    # @return [Hash] the updated experiment object
+    # @raise [APIError] if the request fails
+    def close_experiment(experiment_id:, end_time:, tenant_id: nil)
+      patch("/api/v1/sessions/#{experiment_id}", { end_time: end_time }, tenant_id: tenant_id)
+    end
+
     private
 
     def connection
