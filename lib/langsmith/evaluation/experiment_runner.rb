@@ -66,17 +66,30 @@ module Langsmith
 
         feedback = run_evaluators(example, outputs, run_id)
         { example_id: example[:id], run_id: run_id, status: :success, error: nil, feedback: feedback }
+      rescue StandardError => e
+        { example_id: example[:id], run_id: run_id, status: :success, error: e.message, feedback: nil }
       end
 
       def run_evaluators(example, outputs, run_id)
         return nil if @evaluators.empty? || run_id.nil?
 
         Langsmith.flush
-        run = client.read_run(run_id: run_id)
+        run = fetch_run_with_retry(run_id)
 
         @evaluators.each_with_object({}) do |(key, evaluator), feedback|
           feedback[key] = execute_evaluator(key, evaluator, example, outputs, run_id, run)
         end
+      end
+
+      # LangSmith has indexing lag after batch ingest — the run may not be
+      # queryable immediately. Retry a few times with a short delay.
+      def fetch_run_with_retry(run_id, retries: 3, delay: 1)
+        client.read_run(run_id: run_id)
+      rescue Client::APIError => e
+        raise unless e.status_code == 404 && retries.positive?
+
+        sleep(delay)
+        fetch_run_with_retry(run_id, retries: retries - 1, delay: delay)
       end
 
       def execute_evaluator(key, evaluator, example, outputs, run_id, run)
