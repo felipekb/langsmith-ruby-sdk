@@ -151,6 +151,16 @@ module Langsmith
       post("/api/v1/feedback", payload, tenant_id: resolve_tenant_id(tenant_id))
     end
 
+    # Read a single run by ID.
+    #
+    # @param run_id [String] UUID of the run to fetch
+    # @param tenant_id [String, nil] tenant ID (falls back to configured tenant_id)
+    # @return [Hash] the run object (inputs, outputs, child_run_ids, tokens, etc.)
+    # @raise [APIError] if the request fails
+    def read_run(run_id:, tenant_id: nil)
+      get("/api/v1/runs/#{run_id}", tenant_id: resolve_tenant_id(tenant_id))
+    end
+
     private
 
     def resolve_tenant_id(tenant_id)
