@@ -84,7 +84,72 @@ module Langsmith
       post("/runs/batch", payload, tenant_id: tenant_id)
     end
 
+    # List examples from a LangSmith dataset.
+    #
+    # @param dataset_id [String] the dataset ID to fetch examples from
+    # @param limit [Integer, nil] max number of examples to return (API max: 100)
+    # @param offset [Integer, nil] number of examples to skip
+    # @param tenant_id [String, nil] tenant ID (falls back to configured tenant_id)
+    # @return [Array<Hash>] array of example objects
+    # @raise [APIError] if the request fails
+    def list_examples(dataset_id:, limit: nil, offset: nil, tenant_id: nil)
+      params = { dataset: dataset_id }
+      params[:limit] = limit if limit
+      params[:offset] = offset if offset
+
+      get("/api/v1/examples", params: params, tenant_id: resolve_tenant_id(tenant_id))
+    end
+
+    # Create a new experiment (tracer session) linked to a dataset.
+    #
+    # @param name [String] experiment name
+    # @param dataset_id [String] reference dataset ID
+    # @param description [String, nil] optional experiment description
+    # @param metadata [Hash, nil] optional metadata (stored as `extra`)
+    # @param tenant_id [String, nil] tenant ID (falls back to configured tenant_id)
+    # @return [Hash] the created experiment object
+    # @raise [APIError] if the request fails
+    def create_experiment(name:, dataset_id:, description: nil, metadata: nil, tenant_id: nil)
+      payload = {
+        name: name,
+        reference_dataset_id: dataset_id,
+        start_time: Time.now.utc.iso8601
+      }
+      payload[:description] = description if description
+      payload[:extra] = metadata if metadata
+
+      post("/api/v1/sessions", payload, tenant_id: resolve_tenant_id(tenant_id))
+    end
+
+    # Close an experiment by setting its end time.
+    #
+    # @param experiment_id [String] the experiment (session) ID
+    # @param end_time [String] ISO-8601 end time
+    # @param tenant_id [String, nil] tenant ID (falls back to configured tenant_id)
+    # @return [Hash] the updated experiment object
+    # @raise [APIError] if the request fails
+    def close_experiment(experiment_id:, end_time:, tenant_id: nil)
+      patch("/api/v1/sessions/#{experiment_id}", { end_time: end_time }, tenant_id: resolve_tenant_id(tenant_id))
+    end
+
     private
+
+    def resolve_tenant_id(tenant_id)
+      tenant_id || Langsmith.configuration.tenant_id
+    end
+
+    def get(path, params: {}, tenant_id: nil)
+      response = connection.get(path, params) do |req|
+        req.headers["X-Tenant-Id"] = tenant_id if tenant_id
+      end
+      handle_response(response)
+    rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
+      raise APIError, "Network error: #{e.message}"
+    rescue Faraday::Error => e
+      raise APIError, "Request failed: #{e.message}" unless e.respond_to?(:response) && e.response
+
+      handle_response(e.response)
+    end
 
     def connection
       @connection ||= Faraday.new(url: @endpoint) do |f|
