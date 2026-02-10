@@ -129,4 +129,144 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       expect(Langsmith).to have_received(:flush)
     end
   end
+
+  describe "evaluator support" do
+    before do
+      allow(Langsmith::Context).to receive(:evaluation_root_run_id).and_return("run-abc")
+      allow(client).to receive(:read_run)
+        .and_return({ id: "run-abc", inputs: { q: "hi" }, outputs: { a: "bye" }, total_tokens: 10 })
+      allow(client).to receive(:create_feedback)
+    end
+
+    def run_with_evaluators(evaluators, &block)
+      block ||= proc { |_example| { answer: "result" } }
+      described_class.new(
+        dataset_id: dataset_id,
+        experiment_name: experiment_name,
+        evaluators: evaluators,
+        &block
+      ).run
+    end
+
+    it "calls evaluators with correct keyword arguments" do
+      received_args = {}
+      evaluator = lambda { |outputs:, reference_outputs:, inputs:, run:|
+        received_args = { outputs: outputs, reference_outputs: reference_outputs, inputs: inputs, run: run }
+        1.0
+      }
+
+      run_with_evaluators({ correctness: evaluator })
+
+      expect(received_args[:outputs]).to eq({ answer: "result" })
+      expect(received_args[:reference_outputs]).to eq(examples.first[:outputs])
+      expect(received_args[:inputs]).to eq(examples.first[:inputs])
+      expect(received_args[:run]).to eq({ id: "run-abc", inputs: { q: "hi" }, outputs: { a: "bye" }, total_tokens: 10 })
+    end
+
+    it "calls create_feedback for each evaluator with key and score" do
+      evaluators = {
+        correctness: ->(**_kwargs) { 0.9 },
+        relevance: ->(**_kwargs) { 0.8 }
+      }
+
+      run_with_evaluators(evaluators)
+
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "correctness", score: 0.9, value: nil, comment: nil
+      ).at_least(:once)
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "relevance", score: 0.8, value: nil, comment: nil
+      ).at_least(:once)
+    end
+
+    it "uses Float return as score directly" do
+      run_with_evaluators({ metric: ->(**_kwargs) { 0.75 } })
+
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "metric", score: 0.75, value: nil, comment: nil
+      ).at_least(:once)
+    end
+
+    it "converts true to 1.0" do
+      run_with_evaluators({ metric: ->(**_kwargs) { true } })
+
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "metric", score: 1.0, value: nil, comment: nil
+      ).at_least(:once)
+    end
+
+    it "converts false to 0.0" do
+      run_with_evaluators({ metric: ->(**_kwargs) { false } })
+
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "metric", score: 0.0, value: nil, comment: nil
+      ).at_least(:once)
+    end
+
+    it "extracts score, value, and comment from Hash return" do
+      evaluator = ->(**_kwargs) { { score: 0.5, value: "partial", comment: "half right" } }
+
+      run_with_evaluators({ metric: evaluator })
+
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "metric", score: 0.5, value: "partial", comment: "half right"
+      ).at_least(:once)
+    end
+
+    it "skips feedback when evaluator returns nil" do
+      run_with_evaluators({ metric: ->(**_kwargs) {} })
+
+      expect(client).not_to have_received(:create_feedback)
+    end
+
+    it "does not stop other evaluators when one raises" do
+      bad = ->(**_kwargs) { raise "evaluator boom" }
+      good = ->(**_kwargs) { 1.0 }
+
+      run_with_evaluators({ bad_eval: bad, good_eval: good })
+
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "good_eval", score: 1.0, value: nil, comment: nil
+      ).at_least(:once)
+    end
+
+    it "reports evaluator errors in per-example feedback results" do
+      bad = ->(**_kwargs) { raise "evaluator boom" }
+
+      result = run_with_evaluators({ bad_eval: bad })
+
+      feedback = result[:results].first[:feedback]
+      expect(feedback[:bad_eval][:success]).to be false
+      expect(feedback[:bad_eval][:error]).to eq("evaluator boom")
+    end
+
+    it "includes run_id in per-example results" do
+      result = run_with_evaluators({ metric: ->(**_kwargs) { 1.0 } })
+
+      expect(result[:results].first[:run_id]).to eq("run-abc")
+    end
+
+    it "includes feedback details in per-example results" do
+      result = run_with_evaluators({ metric: ->(**_kwargs) { 0.9 } })
+
+      feedback = result[:results].first[:feedback]
+      expect(feedback[:metric]).to include(score: 0.9, success: true)
+    end
+
+    it "does not call evaluators when no evaluators are provided" do
+      result = run_experiment { |_example| { answer: "result" } }
+
+      expect(client).not_to have_received(:create_feedback)
+      expect(result[:results].first[:feedback]).to be_nil
+    end
+
+    it "does not call evaluators when the user block raises" do
+      evaluator = ->(**_kwargs) { 1.0 }
+
+      result = run_with_evaluators({ metric: evaluator }) { |_example| raise "block error" }
+
+      expect(client).not_to have_received(:create_feedback)
+      expect(result[:results].first[:status]).to eq(:error)
+    end
+  end
 end
