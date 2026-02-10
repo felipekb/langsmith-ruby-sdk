@@ -209,6 +209,30 @@ RSpec.describe Langsmith::Client do
 
       expect(stub).to have_been_requested
     end
+
+    it "falls back to configured tenant_id when not provided" do
+      Langsmith.configuration.tenant_id = "configured-tenant"
+
+      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
+             .with(query: { dataset: "ds-123" }, headers: { "X-Tenant-Id" => "configured-tenant" })
+             .to_return(status: 200, body: examples_body, headers: { "Content-Type" => "application/json" })
+
+      client.list_examples(dataset_id: "ds-123")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "prefers explicit tenant_id over configured one" do
+      Langsmith.configuration.tenant_id = "configured-tenant"
+
+      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
+             .with(query: { dataset: "ds-123" }, headers: { "X-Tenant-Id" => "explicit-tenant" })
+             .to_return(status: 200, body: examples_body, headers: { "Content-Type" => "application/json" })
+
+      client.list_examples(dataset_id: "ds-123", tenant_id: "explicit-tenant")
+
+      expect(stub).to have_been_requested
+    end
   end
 
   describe "#create_experiment" do
