@@ -149,18 +149,19 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
     end
 
     it "calls evaluators with correct keyword arguments" do
-      received_args = {}
+      all_calls = []
       evaluator = lambda { |outputs:, reference_outputs:, inputs:, run:|
-        received_args = { outputs: outputs, reference_outputs: reference_outputs, inputs: inputs, run: run }
+        all_calls << { outputs: outputs, reference_outputs: reference_outputs, inputs: inputs, run: run }
         1.0
       }
 
       run_with_evaluators({ correctness: evaluator })
 
-      expect(received_args[:outputs]).to eq({ answer: "result" })
-      expect(received_args[:reference_outputs]).to eq(examples.first[:outputs])
-      expect(received_args[:inputs]).to eq(examples.first[:inputs])
-      expect(received_args[:run]).to eq({ id: "run-abc", inputs: { q: "hi" }, outputs: { a: "bye" }, total_tokens: 10 })
+      first_call = all_calls.first
+      expect(first_call[:outputs]).to eq({ answer: "result" })
+      expect(first_call[:reference_outputs]).to eq(examples.first[:outputs])
+      expect(first_call[:inputs]).to eq(examples.first[:inputs])
+      expect(first_call[:run]).to eq({ id: "run-abc", inputs: { q: "hi" }, outputs: { a: "bye" }, total_tokens: 10 })
     end
 
     it "calls create_feedback for each evaluator with key and score" do
