@@ -84,6 +84,26 @@ module Langsmith
       post("/runs/batch", payload, tenant_id: tenant_id)
     end
 
+    # Send a GET request to the API.
+    #
+    # @param path [String] API path
+    # @param params [Hash] query parameters
+    # @param tenant_id [String, nil] tenant ID for the request
+    # @return [Hash, Array] parsed API response
+    # @raise [APIError] if the request fails
+    def get(path, params: {}, tenant_id: nil)
+      response = connection.get(path, params) do |req|
+        req.headers["X-Tenant-Id"] = tenant_id if tenant_id
+      end
+      handle_response(response)
+    rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
+      raise APIError, "Network error: #{e.message}"
+    rescue Faraday::Error => e
+      raise APIError, "Request failed: #{e.message}" unless e.respond_to?(:response) && e.response
+
+      handle_response(e.response)
+    end
+
     private
 
     def connection
