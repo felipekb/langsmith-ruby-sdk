@@ -26,6 +26,30 @@ RSpec.describe Langsmith::Run do
       expect(run.tags).to eq(["test"])
     end
 
+    it "defaults reference_example_id to nil" do
+      run = described_class.new(name: "test_run")
+
+      expect(run.reference_example_id).to be_nil
+    end
+
+    it "defaults session_id to nil" do
+      run = described_class.new(name: "test_run")
+
+      expect(run.session_id).to be_nil
+    end
+
+    it "accepts reference_example_id" do
+      run = described_class.new(name: "test_run", reference_example_id: "example-uuid-123")
+
+      expect(run.reference_example_id).to eq("example-uuid-123")
+    end
+
+    it "accepts session_id" do
+      run = described_class.new(name: "test_run", session_id: "session-uuid-456")
+
+      expect(run.session_id).to eq("session-uuid-456")
+    end
+
     it "validates run_type" do
       expect do
         described_class.new(name: "test", run_type: "invalid")
@@ -243,6 +267,52 @@ RSpec.describe Langsmith::Run do
       expect(hash).not_to have_key(:extra)
       expect(hash).not_to have_key(:events)
       expect(hash).not_to have_key(:tags)
+    end
+
+    it "includes reference_example_id when set" do
+      run = described_class.new(name: "test_run", reference_example_id: "example-uuid-123")
+      hash = run.to_h
+
+      expect(hash[:reference_example_id]).to eq("example-uuid-123")
+    end
+
+    it "excludes reference_example_id when nil" do
+      run = described_class.new(name: "test_run")
+      hash = run.to_h
+
+      expect(hash).not_to have_key(:reference_example_id)
+    end
+
+    it "includes session_id when set" do
+      run = described_class.new(name: "test_run", session_id: "session-uuid-456")
+      hash = run.to_h
+
+      expect(hash[:session_id]).to eq("session-uuid-456")
+    end
+
+    it "excludes session_id when nil" do
+      run = described_class.new(name: "test_run")
+      hash = run.to_h
+
+      expect(hash).not_to have_key(:session_id)
+    end
+  end
+
+  describe "#to_update_h" do
+    it "excludes reference_example_id" do
+      run = described_class.new(name: "test_run", reference_example_id: "example-uuid-123")
+      run.finish(outputs: { result: "done" })
+      hash = run.to_update_h
+
+      expect(hash).not_to have_key(:reference_example_id)
+    end
+
+    it "excludes session_id" do
+      run = described_class.new(name: "test_run", session_id: "session-uuid-456")
+      run.finish(outputs: { result: "done" })
+      hash = run.to_update_h
+
+      expect(hash).not_to have_key(:session_id)
     end
   end
 end
