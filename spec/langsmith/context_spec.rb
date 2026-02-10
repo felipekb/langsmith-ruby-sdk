@@ -186,6 +186,27 @@ RSpec.describe Langsmith::Context do
     end
   end
 
+  describe ".set_evaluation_root_run_id / .evaluation_root_run_id" do
+    it "stores and retrieves the root run ID" do
+      described_class.set_evaluation_root_run_id("run-123")
+
+      expect(described_class.evaluation_root_run_id).to eq("run-123")
+    end
+
+    it "returns nil when not in evaluation" do
+      expect(described_class.evaluation_root_run_id).to be_nil
+    end
+
+    it "is cleared after with_evaluation block completes" do
+      described_class.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        described_class.set_evaluation_root_run_id("run-456")
+        expect(described_class.evaluation_root_run_id).to eq("run-456")
+      end
+
+      expect(described_class.evaluation_root_run_id).to be_nil
+    end
+  end
+
   describe ".clear!" do
     it "also clears evaluation context" do
       described_class.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
@@ -194,6 +215,13 @@ RSpec.describe Langsmith::Context do
         expect(described_class.evaluation_context).to be_nil
         expect(described_class.evaluating?).to be false
       end
+    end
+
+    it "also clears evaluation root run ID" do
+      described_class.set_evaluation_root_run_id("run-789")
+      described_class.clear!
+
+      expect(described_class.evaluation_root_run_id).to be_nil
     end
   end
 end
