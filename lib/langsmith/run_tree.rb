@@ -20,29 +20,7 @@ module Langsmith
       tenant_id: nil,
       project: nil
     )
-      # If no explicit parent, check context for current parent
       effective_parent_id = parent_run_id || Context.current_parent_run_id
-
-      # Inherit tenant_id from parent run if not explicitly set
-      effective_tenant_id = tenant_id || Context.current_run&.tenant_id
-
-      # Child traces must use the same project as their parent to keep the trace tree together.
-      # Only root traces can set the project; children always inherit from parent.
-      effective_project = Context.current_run&.session_name || project
-
-      # Inherit trace_id from root run (parent's trace_id)
-      # For root runs, trace_id will default to the run's own ID
-      effective_trace_id = Context.current_run&.trace_id
-
-      # Inherit dotted_order from parent for proper trace ordering
-      parent_dotted_order = Context.current_run&.dotted_order
-
-      # Inject evaluation context when present:
-      # - session_id goes on ALL runs so the entire trace links to the experiment
-      # - reference_example_id goes only on ROOT runs (no parent) per LangSmith API requirement
-      eval_ctx = Context.evaluation_context
-      effective_session_id = eval_ctx&.dig(:experiment_id)
-      effective_ref_example_id = eval_ctx&.dig(:example_id) unless effective_parent_id
 
       @run = Run.new(
         name: name,
@@ -52,13 +30,10 @@ module Langsmith
         metadata: metadata,
         tags: tags,
         extra: extra,
-        tenant_id: effective_tenant_id,
-        session_name: effective_project,
-        trace_id: effective_trace_id,
-        parent_dotted_order: parent_dotted_order,
-        reference_example_id: effective_ref_example_id,
-        session_id: effective_session_id
+        **inherited_run_attrs(effective_parent_id, tenant_id, project)
       )
+
+      register_evaluation_root_run(effective_parent_id)
 
       @posted_start = false
       @posted_end = false
@@ -146,6 +121,28 @@ module Langsmith
     end
 
     private
+
+    # Resolve attributes inherited from parent context and evaluation state.
+    def inherited_run_attrs(effective_parent_id, tenant_id, project)
+      current = Context.current_run
+      eval_ctx = Context.evaluation_context
+
+      {
+        tenant_id: tenant_id || current&.tenant_id,
+        session_name: current&.session_name || project,
+        trace_id: current&.trace_id,
+        parent_dotted_order: current&.dotted_order,
+        session_id: eval_ctx&.dig(:experiment_id),
+        reference_example_id: (eval_ctx&.dig(:example_id) unless effective_parent_id)
+      }
+    end
+
+    # Register the root run ID in evaluation context so the runner can
+    # attach feedback to it later. Only root runs (no parent) register;
+    # child runs must not overwrite.
+    def register_evaluation_root_run(effective_parent_id)
+      Context.set_evaluation_root_run_id(@run.id) if effective_parent_id.nil? && Context.evaluating?
+    end
 
     # Sanitize block results to prevent circular references.
     # When users call methods like `run.add_metadata(...)` as the last line,
