@@ -37,6 +37,12 @@ module Langsmith
     # @return [String, nil] tenant ID for multi-tenant scenarios
     attr_reader :tenant_id
 
+    # @return [String, nil] links this run to a dataset example (for evaluations)
+    attr_reader :reference_example_id
+
+    # @return [String, nil] links this run to an experiment session (overrides project routing)
+    attr_reader :session_id
+
     # @return [String] trace ID (root run's ID)
     attr_reader :trace_id
 
@@ -81,6 +87,8 @@ module Langsmith
     # @param tenant_id [String, nil] tenant ID for multi-tenant scenarios
     # @param trace_id [String, nil] trace ID (defaults to own ID for root runs)
     # @param parent_dotted_order [String, nil] parent's dotted order for tree ordering
+    # @param reference_example_id [String, nil] dataset example ID (for evaluations)
+    # @param session_id [String, nil] experiment session ID (overrides project routing)
     #
     # @raise [ArgumentError] if run_type is invalid
     def initialize(
@@ -95,7 +103,9 @@ module Langsmith
       id: nil,
       tenant_id: nil,
       trace_id: nil,
-      parent_dotted_order: nil
+      parent_dotted_order: nil,
+      reference_example_id: nil,
+      session_id: nil
     )
       @id = id || SecureRandom.uuid
       @name = name
@@ -114,6 +124,8 @@ module Langsmith
       @tags = tags || []
       @extra = extra || {}
       @events = []
+      @reference_example_id = reference_example_id
+      @session_id = session_id
       # dotted_order is used for ordering runs in the trace tree
       @dotted_order = build_dotted_order(parent_dotted_order)
     end
@@ -242,6 +254,8 @@ module Langsmith
         outputs:,
         error:,
         parent_run_id:,
+        reference_example_id:,
+        session_id:,
         trace_id:,
         dotted_order:,
         session_name:,
