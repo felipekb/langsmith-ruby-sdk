@@ -92,72 +92,16 @@ RSpec.describe Langsmith::Client do
     end
   end
 
-  describe "#get" do
-    let(:tenant_id) { "test-tenant-id" }
-    let(:response_body) { [{ id: "example-1", name: "Example 1" }] }
-
-    it "sends GET request and parses response" do
-      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
-             .with(
-               headers: {
-                 "X-API-Key" => api_key
-               }
-             )
-             .to_return(
-               status: 200,
-               body: response_body.to_json,
-               headers: { "Content-Type" => "application/json" }
-             )
-
-      result = client.get("/api/v1/examples", tenant_id: tenant_id)
-
-      expect(stub).to have_been_requested
-      expect(result).to be_an(Array)
-      expect(result.first[:id]).to eq("example-1")
-    end
-
-    it "includes tenant_id header when provided" do
-      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
-             .with(
-               headers: {
-                 "X-API-Key" => api_key,
-                 "X-Tenant-Id" => tenant_id
-               }
-             )
-             .to_return(
-               status: 200,
-               body: response_body.to_json,
-               headers: { "Content-Type" => "application/json" }
-             )
-
-      client.get("/api/v1/examples", tenant_id: tenant_id)
-
-      expect(stub).to have_been_requested
-    end
-
-    it "sends query parameters" do
-      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
-             .with(query: { dataset: "dataset-123" })
-             .to_return(
-               status: 200,
-               body: response_body.to_json,
-               headers: { "Content-Type" => "application/json" }
-             )
-
-      client.get("/api/v1/examples", params: { dataset: "dataset-123" }, tenant_id: tenant_id)
-
-      expect(stub).to have_been_requested
-    end
+  describe "GET error handling" do
+    let(:json_headers) { { "Content-Type" => "application/json" } }
+    let(:examples_query) { { dataset: "ds-123" } }
 
     it "raises APIError on 401" do
       stub_request(:get, "#{endpoint}/api/v1/examples")
-        .to_return(
-          status: 401,
-          body: '{"error": "Unauthorized"}',
-          headers: { "Content-Type" => "application/json" }
-        )
+        .with(query: examples_query)
+        .to_return(status: 401, body: '{"error": "Unauthorized"}', headers: json_headers)
 
-      expect { client.get("/api/v1/examples", tenant_id: tenant_id) }
+      expect { client.list_examples(dataset_id: "ds-123") }
         .to raise_error(Langsmith::Client::APIError) do |error|
           expect(error.status_code).to eq(401)
           expect(error.message).to include("Unauthorized")
@@ -166,27 +110,19 @@ RSpec.describe Langsmith::Client do
 
     it "raises APIError on 404" do
       stub_request(:get, "#{endpoint}/api/v1/examples")
-        .to_return(
-          status: 404,
-          body: '{"error": "Not found"}',
-          headers: { "Content-Type" => "application/json" }
-        )
+        .with(query: examples_query)
+        .to_return(status: 404, body: '{"error": "Not found"}', headers: json_headers)
 
-      expect { client.get("/api/v1/examples", tenant_id: tenant_id) }
-        .to raise_error(Langsmith::Client::APIError) do |error|
-          expect(error.status_code).to eq(404)
-        end
+      expect { client.list_examples(dataset_id: "ds-123") }
+        .to raise_error(Langsmith::Client::APIError) { |e| expect(e.status_code).to eq(404) }
     end
 
     it "raises APIError on 429" do
       stub_request(:get, "#{endpoint}/api/v1/examples")
-        .to_return(
-          status: 429,
-          body: '{"error": "Rate limited"}',
-          headers: { "Content-Type" => "application/json" }
-        )
+        .with(query: examples_query)
+        .to_return(status: 429, body: '{"error": "Rate limited"}', headers: json_headers)
 
-      expect { client.get("/api/v1/examples", tenant_id: tenant_id) }
+      expect { client.list_examples(dataset_id: "ds-123") }
         .to raise_error(Langsmith::Client::APIError) do |error|
           expect(error.status_code).to eq(429)
           expect(error.message).to include("Rate limited")
@@ -195,36 +131,29 @@ RSpec.describe Langsmith::Client do
 
     it "raises APIError on 500" do
       stub_request(:get, "#{endpoint}/api/v1/examples")
-        .to_return(
-          status: 500,
-          body: '{"error": "Internal Server Error"}',
-          headers: { "Content-Type" => "application/json" }
-        )
+        .with(query: examples_query)
+        .to_return(status: 500, body: '{"error": "Server"}', headers: json_headers)
 
-      expect { client.get("/api/v1/examples", tenant_id: tenant_id) }
-        .to raise_error(Langsmith::Client::APIError) do |error|
-          expect(error.status_code).to eq(500)
-        end
+      expect { client.list_examples(dataset_id: "ds-123") }
+        .to raise_error(Langsmith::Client::APIError) { |e| expect(e.status_code).to eq(500) }
     end
 
     it "raises APIError on connection failure" do
       stub_request(:get, "#{endpoint}/api/v1/examples")
+        .with(query: examples_query)
         .to_raise(Faraday::ConnectionFailed.new("Connection refused"))
 
-      expect { client.get("/api/v1/examples", tenant_id: tenant_id) }
-        .to raise_error(Langsmith::Client::APIError) do |error|
-          expect(error.message).to include("Network error")
-        end
+      expect { client.list_examples(dataset_id: "ds-123") }
+        .to raise_error(Langsmith::Client::APIError) { |e| expect(e.message).to include("Network error") }
     end
 
     it "raises APIError on timeout" do
       stub_request(:get, "#{endpoint}/api/v1/examples")
+        .with(query: examples_query)
         .to_timeout
 
-      expect { client.get("/api/v1/examples", tenant_id: tenant_id) }
-        .to raise_error(Langsmith::Client::APIError) do |error|
-          expect(error.message).to include("Network error")
-        end
+      expect { client.list_examples(dataset_id: "ds-123") }
+        .to raise_error(Langsmith::Client::APIError) { |e| expect(e.message).to include("Network error") }
     end
   end
 
@@ -270,6 +199,16 @@ RSpec.describe Langsmith::Client do
       expect(result.first[:inputs]).to eq({ text: "hello" })
       expect(result.first[:outputs]).to eq({ label: "greeting" })
     end
+
+    it "forwards limit and offset query params" do
+      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
+             .with(query: { dataset: "ds-123", limit: "10", offset: "20" })
+             .to_return(status: 200, body: "[]", headers: { "Content-Type" => "application/json" })
+
+      client.list_examples(dataset_id: "ds-123", limit: 10, offset: 20, tenant_id: tenant_id)
+
+      expect(stub).to have_been_requested
+    end
   end
 
   describe "#create_experiment" do
@@ -306,12 +245,28 @@ RSpec.describe Langsmith::Client do
       expect(stub).to have_been_requested
     end
 
-    it "sends only provided fields" do
+    it "sends only provided fields and defaults start_time" do
       stub = stub_request(:post, "#{endpoint}/api/v1/sessions")
              .with do |request|
                body = JSON.parse(request.body, symbolize_names: true)
                body[:name] == "my-experiment" && body[:reference_dataset_id] == "ds-123" &&
-                 !body.key?(:description) && !body.key?(:extra)
+                 !body.key?(:description) && !body.key?(:extra) && body.key?(:start_time)
+             end
+             .to_return(status: 200, body: session_body, headers: { "Content-Type" => "application/json" })
+
+      client.create_experiment(name: "my-experiment", dataset_id: "ds-123", tenant_id: tenant_id)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "includes start_time as ISO-8601 string" do
+      frozen_time = Time.utc(2026, 2, 10, 12, 0, 0)
+      allow(Time).to receive(:now).and_return(frozen_time)
+
+      stub = stub_request(:post, "#{endpoint}/api/v1/sessions")
+             .with do |request|
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:start_time] == "2026-02-10T12:00:00Z"
              end
              .to_return(status: 200, body: session_body, headers: { "Content-Type" => "application/json" })
 

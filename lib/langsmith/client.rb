@@ -84,34 +84,20 @@ module Langsmith
       post("/runs/batch", payload, tenant_id: tenant_id)
     end
 
-    # Send a GET request to the API.
-    #
-    # @param path [String] API path
-    # @param params [Hash] query parameters
-    # @param tenant_id [String, nil] tenant ID for the request
-    # @return [Hash, Array] parsed API response
-    # @raise [APIError] if the request fails
-    def get(path, params: {}, tenant_id: nil)
-      response = connection.get(path, params) do |req|
-        req.headers["X-Tenant-Id"] = tenant_id if tenant_id
-      end
-      handle_response(response)
-    rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
-      raise APIError, "Network error: #{e.message}"
-    rescue Faraday::Error => e
-      raise APIError, "Request failed: #{e.message}" unless e.respond_to?(:response) && e.response
-
-      handle_response(e.response)
-    end
-
     # List examples from a LangSmith dataset.
     #
     # @param dataset_id [String] the dataset ID to fetch examples from
+    # @param limit [Integer, nil] max number of examples to return (API max: 100)
+    # @param offset [Integer, nil] number of examples to skip
     # @param tenant_id [String, nil] tenant ID for the request
     # @return [Array<Hash>] array of example objects
     # @raise [APIError] if the request fails
-    def list_examples(dataset_id:, tenant_id: nil)
-      get("/api/v1/examples", params: { dataset: dataset_id }, tenant_id: tenant_id)
+    def list_examples(dataset_id:, limit: nil, offset: nil, tenant_id: nil)
+      params = { dataset: dataset_id }
+      params[:limit] = limit if limit
+      params[:offset] = offset if offset
+
+      get("/api/v1/examples", params: params, tenant_id: tenant_id)
     end
 
     # Create a new experiment (tracer session) linked to a dataset.
@@ -124,7 +110,11 @@ module Langsmith
     # @return [Hash] the created experiment object
     # @raise [APIError] if the request fails
     def create_experiment(name:, dataset_id:, description: nil, metadata: nil, tenant_id: nil)
-      payload = { name: name, reference_dataset_id: dataset_id }
+      payload = {
+        name: name,
+        reference_dataset_id: dataset_id,
+        start_time: Time.now.utc.iso8601
+      }
       payload[:description] = description if description
       payload[:extra] = metadata if metadata
 
@@ -143,6 +133,19 @@ module Langsmith
     end
 
     private
+
+    def get(path, params: {}, tenant_id: nil)
+      response = connection.get(path, params) do |req|
+        req.headers["X-Tenant-Id"] = tenant_id if tenant_id
+      end
+      handle_response(response)
+    rescue Faraday::ConnectionFailed, Faraday::TimeoutError => e
+      raise APIError, "Network error: #{e.message}"
+    rescue Faraday::Error => e
+      raise APIError, "Request failed: #{e.message}" unless e.respond_to?(:response) && e.response
+
+      handle_response(e.response)
+    end
 
     def connection
       @connection ||= Faraday.new(url: @endpoint) do |f|
