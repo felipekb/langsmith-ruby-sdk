@@ -141,4 +141,46 @@ RSpec.describe Langsmith::RunTree do
       expect(child.run.run_type).to eq("tool")
     end
   end
+
+  describe "evaluation context injection" do
+    it "injects both reference_example_id and session_id into root runs" do
+      Langsmith::Context.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        run_tree = described_class.new(name: "root_run")
+
+        expect(run_tree.run.reference_example_id).to eq("ex-1")
+        expect(run_tree.run.session_id).to eq("exp-1")
+      end
+    end
+
+    it "injects session_id but not reference_example_id into child runs" do
+      Langsmith::Context.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        parent_run = Langsmith::Run.new(name: "parent")
+        Langsmith::Context.push(parent_run)
+
+        run_tree = described_class.new(name: "child_run")
+
+        expect(run_tree.run.session_id).to eq("exp-1")
+        expect(run_tree.run.reference_example_id).to be_nil
+      end
+    end
+
+    it "does not inject attributes when not in evaluation context" do
+      run_tree = described_class.new(name: "normal_run")
+
+      expect(run_tree.run.reference_example_id).to be_nil
+      expect(run_tree.run.session_id).to be_nil
+    end
+
+    it "does not change existing run creation behavior when not evaluating" do
+      parent_run = Langsmith::Run.new(name: "parent")
+      Langsmith::Context.push(parent_run)
+
+      run_tree = described_class.new(name: "child", inputs: { q: "hello" })
+
+      expect(run_tree.run.parent_run_id).to eq(parent_run.id)
+      expect(run_tree.run.inputs).to eq({ q: "hello" })
+      expect(run_tree.run.reference_example_id).to be_nil
+      expect(run_tree.run.session_id).to be_nil
+    end
+  end
 end
