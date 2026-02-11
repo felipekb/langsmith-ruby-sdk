@@ -21,14 +21,16 @@ module Langsmith
     # @param experiment_name [String] name for the experiment
     # @param description [String, nil] optional experiment description
     # @param metadata [Hash, nil] optional experiment metadata
+    # @param evaluators [Hash] map of evaluator key to callable (see ExperimentRunner)
     # @yield [Hash] each dataset example
     # @return [Hash] summary with :experiment_id, :total, :succeeded, :failed, :results
-    def self.run(dataset_id:, experiment_name:, description: nil, metadata: nil, &block)
+    def self.run(dataset_id:, experiment_name:, description: nil, metadata: nil, evaluators: {}, &block)
       ExperimentRunner.new(
         dataset_id: dataset_id,
         experiment_name: experiment_name,
         description: description,
         metadata: metadata,
+        evaluators: evaluators,
         &block
       ).run
     end

@@ -17,6 +17,22 @@ RSpec.describe Langsmith::Evaluation do
         experiment_name: "test",
         description: nil,
         metadata: nil,
+        evaluators: {},
+        &block
+      )
+    end
+
+    it "forwards evaluators to ExperimentRunner" do
+      evaluators = { correctness: ->(**_kwargs) { 1.0 } }
+
+      described_class.run(dataset_id: "ds-1", experiment_name: "test", evaluators: evaluators, &block)
+
+      expect(Langsmith::Evaluation::ExperimentRunner).to have_received(:new).with(
+        dataset_id: "ds-1",
+        experiment_name: "test",
+        description: nil,
+        metadata: nil,
+        evaluators: evaluators,
         &block
       )
     end
