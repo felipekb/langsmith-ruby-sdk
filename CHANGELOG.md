@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-02-11
+
+### Added
+
+- Evaluation module and `ExperimentRunner` for running experiments against datasets
+- Evaluator protocol with support for custom evaluators in `ExperimentRunner`
+- `Client#create_feedback` for submitting evaluation feedback (`POST /api/v1/feedback`)
+- `Client#read_run` for fetching run details (`GET /api/v1/runs/:run_id`)
+- Evaluation API methods: `list_examples`, `create_experiment`, `close_experiment`
+- Evaluation context wired into run creation
+- Root run ID tracking in evaluation context and `RunTree`
+- `reference_example_id` and `session_id` attributes on `Run`
+
+### Fixed
+
+- Retry with delay for `read_run` after flush for reliable evaluation reads
+- Graceful error handling separating user block errors from evaluator errors
+- Root run ID read before `with_evaluation` clears it
+
 ## [0.2.0] - 2025-12-21
 
 ### Added
@@ -58,7 +77,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `prompt` - Prompt template rendering
 - `parser` - Output parsing operations
 
-[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/felipekb/langsmith-ruby-sdk/releases/tag/v0.1.0
