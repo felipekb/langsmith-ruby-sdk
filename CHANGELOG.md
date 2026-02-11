@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-02-11
+
+### Fixed
+
+- Pin `connection_pool` to 2.5.5 (3.0.2 was yanked from RubyGems, breaking installs on Ruby 3.1)
+
 ## [0.3.0] - 2026-02-11
 
 ### Added
@@ -77,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `prompt` - Prompt template rendering
 - `parser` - Output parsing operations
 
-[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/felipekb/langsmith-ruby-sdk/compare/v0.1.0...v0.1.1
