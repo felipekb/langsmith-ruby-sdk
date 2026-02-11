@@ -132,6 +132,35 @@ module Langsmith
       patch("/api/v1/sessions/#{experiment_id}", { end_time: end_time }, tenant_id: resolve_tenant_id(tenant_id))
     end
 
+    # Create feedback (a score/annotation) on a run.
+    #
+    # @param run_id [String] UUID of the run to attach feedback to
+    # @param key [String] metric name (e.g. "correctness")
+    # @param score [Numeric, nil] numeric score (typically 0.0-1.0)
+    # @param value [String, nil] categorical value (alternative to score)
+    # @param comment [String, nil] explanation or reasoning
+    # @param tenant_id [String, nil] tenant ID (falls back to configured tenant_id)
+    # @return [Hash] the created feedback object
+    # @raise [APIError] if the request fails
+    def create_feedback(run_id:, key:, score: nil, value: nil, comment: nil, tenant_id: nil)
+      payload = { run_id: run_id, key: key }
+      payload[:score] = score if score
+      payload[:value] = value if value
+      payload[:comment] = comment if comment
+
+      post("/api/v1/feedback", payload, tenant_id: resolve_tenant_id(tenant_id))
+    end
+
+    # Read a single run by ID.
+    #
+    # @param run_id [String] UUID of the run to fetch
+    # @param tenant_id [String, nil] tenant ID (falls back to configured tenant_id)
+    # @return [Hash] the run object (inputs, outputs, child_run_ids, tokens, etc.)
+    # @raise [APIError] if the request fails
+    def read_run(run_id:, tenant_id: nil)
+      get("/api/v1/runs/#{run_id}", tenant_id: resolve_tenant_id(tenant_id))
+    end
+
     private
 
     def resolve_tenant_id(tenant_id)

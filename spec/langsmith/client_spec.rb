@@ -333,6 +333,126 @@ RSpec.describe Langsmith::Client do
     end
   end
 
+  describe "#create_feedback" do
+    let(:json_headers) { { "Content-Type" => "application/json" } }
+    let(:feedback_response) { { id: "fb-1", run_id: "run-123", key: "correctness" }.to_json }
+
+    it "sends POST to /api/v1/feedback with run_id, key, and score" do
+      stub = stub_request(:post, "#{endpoint}/api/v1/feedback")
+             .with do |request|
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:run_id] == "run-123" && body[:key] == "correctness" && body[:score] == 1
+             end
+             .to_return(status: 200, body: feedback_response, headers: json_headers)
+
+      client.create_feedback(run_id: "run-123", key: "correctness", score: 1)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends POST with value instead of score" do
+      stub = stub_request(:post, "#{endpoint}/api/v1/feedback")
+             .with do |request|
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:run_id] == "run-123" && body[:key] == "sentiment" &&
+                 body[:value] == "positive" && !body.key?(:score)
+             end
+             .to_return(status: 200, body: feedback_response, headers: json_headers)
+
+      client.create_feedback(run_id: "run-123", key: "sentiment", value: "positive")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends POST with comment" do
+      stub = stub_request(:post, "#{endpoint}/api/v1/feedback")
+             .with do |request|
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:run_id] == "run-123" && body[:key] == "quality" && body[:comment] == "Looks good"
+             end
+             .to_return(status: 200, body: feedback_response, headers: json_headers)
+
+      client.create_feedback(run_id: "run-123", key: "quality", comment: "Looks good")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "includes tenant_id header" do
+      tenant_id = "test-tenant-id"
+      stub = stub_request(:post, "#{endpoint}/api/v1/feedback")
+             .with(headers: { "X-Tenant-Id" => tenant_id })
+             .to_return(status: 200, body: feedback_response, headers: json_headers)
+
+      client.create_feedback(run_id: "run-123", key: "correctness", score: 1, tenant_id: tenant_id)
+
+      expect(stub).to have_been_requested
+    end
+
+    it "sends only required fields when optionals are omitted" do
+      stub = stub_request(:post, "#{endpoint}/api/v1/feedback")
+             .with do |request|
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:run_id] == "run-123" && body[:key] == "relevance" &&
+                 !body.key?(:score) && !body.key?(:value) && !body.key?(:comment)
+             end
+             .to_return(status: 200, body: feedback_response, headers: json_headers)
+
+      client.create_feedback(run_id: "run-123", key: "relevance")
+
+      expect(stub).to have_been_requested
+    end
+  end
+
+  describe "#read_run" do
+    let(:json_headers) { { "Content-Type" => "application/json" } }
+    let(:run_response) do
+      {
+        id: "run-abc-123",
+        name: "my-chain",
+        run_type: "chain",
+        inputs: { question: "hello" },
+        outputs: { answer: "world" },
+        start_time: "2026-02-10T12:00:00Z",
+        end_time: "2026-02-10T12:00:01Z",
+        extra: { metadata: { model: "gpt-4" } },
+        total_tokens: 42,
+        child_run_ids: %w[child-1 child-2]
+      }.to_json
+    end
+
+    it "sends GET to /api/v1/runs/:run_id" do
+      stub = stub_request(:get, "#{endpoint}/api/v1/runs/run-abc-123")
+             .to_return(status: 200, body: run_response, headers: json_headers)
+
+      client.read_run(run_id: "run-abc-123")
+
+      expect(stub).to have_been_requested
+    end
+
+    it "returns the run object with expected fields" do
+      stub_request(:get, "#{endpoint}/api/v1/runs/run-abc-123")
+        .to_return(status: 200, body: run_response, headers: json_headers)
+
+      result = client.read_run(run_id: "run-abc-123")
+
+      expect(result[:id]).to eq("run-abc-123")
+      expect(result[:inputs]).to eq({ question: "hello" })
+      expect(result[:outputs]).to eq({ answer: "world" })
+      expect(result[:child_run_ids]).to eq(%w[child-1 child-2])
+    end
+
+    it "includes tenant_id header" do
+      tenant_id = "test-tenant-id"
+      stub = stub_request(:get, "#{endpoint}/api/v1/runs/run-abc-123")
+             .with(headers: { "X-Tenant-Id" => tenant_id })
+             .to_return(status: 200, body: run_response, headers: json_headers)
+
+      client.read_run(run_id: "run-abc-123", tenant_id: tenant_id)
+
+      expect(stub).to have_been_requested
+    end
+  end
+
   describe "error handling" do
     let(:run) { Langsmith::Run.new(name: "test_run") }
 
