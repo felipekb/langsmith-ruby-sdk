@@ -12,7 +12,8 @@ module Langsmith
   # and caused test failures on Ruby 3.2.
   module Context
     CONTEXT_KEY = :langsmith_run_stack
-    private_constant :CONTEXT_KEY
+    EVALUATION_CONTEXT_KEY = :langsmith_evaluation_context
+    private_constant :CONTEXT_KEY, :EVALUATION_CONTEXT_KEY
 
     class << self
       # Returns the current run stack for this thread.
@@ -49,9 +50,10 @@ module Langsmith
         pop
       end
 
-      # Clear the entire run stack (useful for testing)
+      # Clear the entire run stack and evaluation context (useful for testing)
       def clear!
         Thread.current[CONTEXT_KEY] = []
+        Thread.current[EVALUATION_CONTEXT_KEY] = nil
       end
 
       # Check if there's an active trace context
@@ -67,6 +69,30 @@ module Langsmith
       # Get the root run of the current trace tree
       def root_run
         run_stack.first
+      end
+
+      # Returns the current evaluation context, or nil when not in evaluation.
+      # @return [Hash, nil] hash with :experiment_id and :example_id, or nil
+      def evaluation_context
+        Thread.current[EVALUATION_CONTEXT_KEY]
+      end
+
+      # Returns true when evaluation context is set.
+      # @return [Boolean]
+      def evaluating?
+        !evaluation_context.nil?
+      end
+
+      # Execute a block with evaluation context set.
+      # Context is cleared in ensure block even if the block raises.
+      #
+      # @param experiment_id [String] the experiment session ID
+      # @param example_id [String] the dataset example ID
+      def with_evaluation(experiment_id:, example_id:)
+        Thread.current[EVALUATION_CONTEXT_KEY] = { experiment_id: experiment_id, example_id: example_id }
+        yield
+      ensure
+        Thread.current[EVALUATION_CONTEXT_KEY] = nil
       end
     end
   end
