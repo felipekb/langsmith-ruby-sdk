@@ -13,7 +13,8 @@ module Langsmith
   module Context
     CONTEXT_KEY = :langsmith_run_stack
     EVALUATION_CONTEXT_KEY = :langsmith_evaluation_context
-    private_constant :CONTEXT_KEY, :EVALUATION_CONTEXT_KEY
+    EVALUATION_ROOT_RUN_ID_KEY = :langsmith_evaluation_root_run_id
+    private_constant :CONTEXT_KEY, :EVALUATION_CONTEXT_KEY, :EVALUATION_ROOT_RUN_ID_KEY
 
     class << self
       # Returns the current run stack for this thread.
@@ -54,6 +55,7 @@ module Langsmith
       def clear!
         Thread.current[CONTEXT_KEY] = []
         Thread.current[EVALUATION_CONTEXT_KEY] = nil
+        Thread.current[EVALUATION_ROOT_RUN_ID_KEY] = nil
       end
 
       # Check if there's an active trace context
@@ -83,6 +85,20 @@ module Langsmith
         !evaluation_context.nil?
       end
 
+      # Stores the root run ID for the current evaluation example.
+      # Called by RunTree when creating the first root run inside an evaluation block.
+      #
+      # @param run_id [String] the root run's ID
+      def set_evaluation_root_run_id(run_id)
+        Thread.current[EVALUATION_ROOT_RUN_ID_KEY] = run_id
+      end
+
+      # Returns the root run ID for the current evaluation example, or nil.
+      # @return [String, nil]
+      def evaluation_root_run_id
+        Thread.current[EVALUATION_ROOT_RUN_ID_KEY]
+      end
+
       # Execute a block with evaluation context set.
       # Context is cleared in ensure block even if the block raises.
       #
@@ -93,6 +109,7 @@ module Langsmith
         yield
       ensure
         Thread.current[EVALUATION_CONTEXT_KEY] = nil
+        Thread.current[EVALUATION_ROOT_RUN_ID_KEY] = nil
       end
     end
   end

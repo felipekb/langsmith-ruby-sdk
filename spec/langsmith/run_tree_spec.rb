@@ -182,5 +182,25 @@ RSpec.describe Langsmith::RunTree do
       expect(run_tree.run.reference_example_id).to be_nil
       expect(run_tree.run.session_id).to be_nil
     end
+
+    it "registers root run ID in evaluation context when creating a root run" do
+      Langsmith::Context.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        run_tree = described_class.new(name: "root_run")
+
+        expect(Langsmith::Context.evaluation_root_run_id).to eq(run_tree.run.id)
+      end
+    end
+
+    it "does not overwrite root run ID when creating a child run" do
+      Langsmith::Context.with_evaluation(experiment_id: "exp-1", example_id: "ex-1") do
+        root_tree = described_class.new(name: "root_run")
+        root_id = root_tree.run.id
+
+        Langsmith::Context.push(root_tree.run)
+        described_class.new(name: "child_run")
+
+        expect(Langsmith::Context.evaluation_root_run_id).to eq(root_id)
+      end
+    end
   end
 end
