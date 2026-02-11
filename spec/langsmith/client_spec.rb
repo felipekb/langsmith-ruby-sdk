@@ -33,10 +33,10 @@ RSpec.describe Langsmith::Client do
     it "includes run data in request body" do
       stub = stub_request(:post, "#{endpoint}/runs")
              .with do |request|
-        body = JSON.parse(request.body, symbolize_names: true)
-        body[:name] == "test_run" && body[:run_type] == "chain"
-      end
-        .to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:name] == "test_run" && body[:run_type] == "chain"
+             end
+             .to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
 
       client.create_run(run)
 
@@ -73,10 +73,10 @@ RSpec.describe Langsmith::Client do
     it "includes post and patch arrays in body" do
       stub = stub_request(:post, "#{endpoint}/runs/batch")
              .with do |request|
-        body = JSON.parse(request.body, symbolize_names: true)
-        body[:post].length == 1 && body[:patch].length == 1
-      end
-        .to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
+               body = JSON.parse(request.body, symbolize_names: true)
+               body[:post].length == 1 && body[:patch].length == 1
+             end
+             .to_return(status: 200, body: "{}", headers: { "Content-Type" => "application/json" })
 
       client.batch_ingest(post_runs: [run1], patch_runs: [run2])
 
