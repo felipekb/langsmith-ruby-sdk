@@ -163,7 +163,7 @@ RSpec.describe Langsmith::Client do
     let(:examples_query) { { dataset: "ds-123" } }
 
     it "retries a timeout once and then succeeds" do
-      allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep)
+      allow(Kernel).to receive(:sleep)
 
       stub = stub_request(:get, "#{endpoint}/api/v1/examples")
              .with(query: examples_query)
