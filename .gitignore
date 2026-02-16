@@ -1,2 +1,3 @@
 .cursor/
 spec/examples.txt
+.rubocop_cache/

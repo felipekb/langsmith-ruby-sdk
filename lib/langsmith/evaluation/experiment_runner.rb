@@ -13,13 +13,16 @@ module Langsmith
       # @param description [String, nil] optional experiment description
       # @param metadata [Hash, nil] optional experiment metadata
       # @param evaluators [Hash] map of evaluator key to callable
+      # @param tenant_id [String, nil] tenant ID for dataset/session/feedback API calls
       # @param block [Proc] block that receives each example and produces a result
-      def initialize(dataset_id:, experiment_name:, description: nil, metadata: nil, evaluators: {}, &block)
+      def initialize(dataset_id:, experiment_name:, description: nil, metadata: nil, evaluators: {}, tenant_id: nil,
+                     &block)
         @dataset_id = dataset_id
         @experiment_name = experiment_name
         @description = description
         @metadata = metadata
         @evaluators = evaluators
+        @tenant_id = tenant_id
         @block = block
       end
 
@@ -27,22 +30,22 @@ module Langsmith
       #
       # @return [Hash] summary with :experiment_id, :total, :succeeded, :failed, :results
       def run
-        examples = client.list_examples(dataset_id: @dataset_id)
+        experiment_id = nil
+        examples = client.list_examples(dataset_id: @dataset_id, tenant_id: @tenant_id)
 
         experiment = client.create_experiment(
           name: @experiment_name,
           dataset_id: @dataset_id,
           description: @description,
-          metadata: @metadata
+          metadata: @metadata,
+          tenant_id: @tenant_id
         )
         experiment_id = experiment[:id]
 
         results = examples.map { |example| run_example(example, experiment_id) }
-
-        Langsmith.flush
-        client.close_experiment(experiment_id: experiment_id, end_time: Time.now.utc.iso8601)
-
         build_summary(experiment_id, results)
+      ensure
+        close_experiment(experiment_id) if experiment_id
       end
 
       private
@@ -54,45 +57,53 @@ module Langsmith
       def run_example(example, experiment_id)
         outputs = nil
         run_id = nil
+        run_tenant_id = nil
 
         begin
           Context.with_evaluation(experiment_id: experiment_id, example_id: example[:id]) do
             outputs = @block.call(example)
             run_id = Context.evaluation_root_run_id
+            run_tenant_id = Context.evaluation_root_run_tenant_id
           end
         rescue StandardError => e
           return { example_id: example[:id], run_id: nil, status: :error, error: e.message, feedback: nil }
         end
 
-        feedback = run_evaluators(example, outputs, run_id)
+        feedback = run_evaluators(example, outputs, run_id, run_tenant_id)
         { example_id: example[:id], run_id: run_id, status: :success, error: nil, feedback: feedback }
       rescue StandardError => e
         { example_id: example[:id], run_id: run_id, status: :success, error: e.message, feedback: nil }
       end
 
-      def run_evaluators(example, outputs, run_id)
+      def run_evaluators(example, outputs, run_id, run_tenant_id)
         return nil if @evaluators.empty? || run_id.nil?
 
+        tenant_id = run_tenant_id || @tenant_id
         Langsmith.flush
-        run = fetch_run_with_retry(run_id)
+        run = fetch_run_with_retry(run_id, tenant_id: tenant_id)
 
         @evaluators.each_with_object({}) do |(key, evaluator), feedback|
-          feedback[key] = execute_evaluator(key, evaluator, example, outputs, run_id, run)
+          feedback[key] = execute_evaluator(key, evaluator, example, outputs, run_id, run, tenant_id)
         end
       end
 
       # LangSmith has indexing lag after batch ingest — the run may not be
       # queryable immediately. Retry a few times with a short delay.
-      def fetch_run_with_retry(run_id, retries: 3, delay: 1)
-        client.read_run(run_id: run_id)
+      def fetch_run_with_retry(run_id, tenant_id:, retries: 3, delay: 1)
+        client.read_run(run_id: run_id, tenant_id: tenant_id)
       rescue Client::APIError => e
         raise unless e.status_code == 404 && retries.positive?
 
         sleep(delay)
-        fetch_run_with_retry(run_id, retries: retries - 1, delay: delay)
+        fetch_run_with_retry(run_id, tenant_id: tenant_id, retries: retries - 1, delay: delay)
       end
 
-      def execute_evaluator(key, evaluator, example, outputs, run_id, run)
+      def close_experiment(experiment_id)
+        Langsmith.flush
+        client.close_experiment(experiment_id: experiment_id, end_time: Time.now.utc.iso8601, tenant_id: @tenant_id)
+      end
+
+      def execute_evaluator(key, evaluator, example, outputs, run_id, run, tenant_id)
         result = evaluator.call(
           outputs: outputs,
           reference_outputs: example[:outputs],
@@ -102,7 +113,7 @@ module Langsmith
         return { score: nil, success: true, skipped: true } if result.nil?
 
         normalized = normalize_result(result)
-        client.create_feedback(run_id: run_id, key: key.to_s, **normalized)
+        client.create_feedback(run_id: run_id, key: key.to_s, tenant_id: tenant_id, **normalized)
         normalized.merge(success: true)
       rescue StandardError => e
         { score: nil, success: false, error: e.message }

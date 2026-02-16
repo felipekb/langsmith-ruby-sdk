@@ -93,6 +93,7 @@ RSpec.describe Langsmith::Client do
   end
 
   describe "GET error handling" do
+    let(:client) { described_class.new(api_key: api_key, endpoint: endpoint, max_retries: 0) }
     let(:json_headers) { { "Content-Type" => "application/json" } }
     let(:examples_query) { { dataset: "ds-123" } }
 
@@ -154,6 +155,26 @@ RSpec.describe Langsmith::Client do
 
       expect { client.list_examples(dataset_id: "ds-123") }
         .to raise_error(Langsmith::Client::APIError) { |e| expect(e.message).to include("Network error") }
+    end
+  end
+
+  describe "GET retry behavior" do
+    let(:client) { described_class.new(api_key: api_key, endpoint: endpoint, max_retries: 1) }
+    let(:examples_query) { { dataset: "ds-123" } }
+
+    it "retries a timeout once and then succeeds" do
+      allow_any_instance_of(Faraday::Retry::Middleware).to receive(:sleep)
+
+      stub = stub_request(:get, "#{endpoint}/api/v1/examples")
+             .with(query: examples_query)
+             .to_timeout
+             .then
+             .to_return(status: 200, body: "[]", headers: { "Content-Type" => "application/json" })
+
+      result = client.list_examples(dataset_id: "ds-123")
+
+      expect(result).to eq([])
+      expect(stub).to have_been_requested.times(2)
     end
   end
 
