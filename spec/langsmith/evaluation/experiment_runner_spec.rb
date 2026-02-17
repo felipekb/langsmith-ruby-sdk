@@ -30,11 +30,20 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
     ).run
   end
 
+  def run_experiment_for_tenant(tenant_id, &block)
+    described_class.new(
+      dataset_id: dataset_id,
+      experiment_name: experiment_name,
+      tenant_id: tenant_id,
+      &block
+    ).run
+  end
+
   describe "#run" do
     it "fetches examples from the dataset" do
       run_experiment { |example| example }
 
-      expect(client).to have_received(:list_examples).with(dataset_id: dataset_id)
+      expect(client).to have_received(:list_examples).with(dataset_id: dataset_id, tenant_id: nil)
     end
 
     it "creates an experiment with correct parameters" do
@@ -44,7 +53,8 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
         name: experiment_name,
         dataset_id: dataset_id,
         description: nil,
-        metadata: nil
+        metadata: nil,
+        tenant_id: nil
       )
     end
 
@@ -60,7 +70,27 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
         name: experiment_name,
         dataset_id: dataset_id,
         description: "A test",
-        metadata: { version: 1 }
+        metadata: { version: 1 },
+        tenant_id: nil
+      )
+    end
+
+    it "forwards tenant_id to dataset and experiment API calls" do
+      runner_tenant_id = "tenant-123"
+      run_experiment_for_tenant(runner_tenant_id) { |example| example }
+
+      expect(client).to have_received(:list_examples).with(dataset_id: dataset_id, tenant_id: runner_tenant_id)
+      expect(client).to have_received(:create_experiment).with(
+        name: experiment_name,
+        dataset_id: dataset_id,
+        description: nil,
+        metadata: nil,
+        tenant_id: runner_tenant_id
+      )
+      expect(client).to have_received(:close_experiment).with(
+        experiment_id: "exp-1",
+        tenant_id: runner_tenant_id,
+        end_time: kind_of(String)
       )
     end
 
@@ -87,6 +117,19 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
 
       expect(client).to have_received(:close_experiment) do |args|
         expect(args[:experiment_id]).to eq("exp-1")
+        expect(args[:tenant_id]).to be_nil
+        expect(args[:end_time]).to be_a(String)
+      end
+    end
+
+    it "closes the experiment even when an unexpected error is raised while processing examples" do
+      runner = described_class.new(dataset_id: dataset_id, experiment_name: experiment_name) { |example| example }
+      allow(runner).to receive(:run_example).and_raise("unexpected failure")
+
+      expect { runner.run }.to raise_error("unexpected failure")
+      expect(client).to have_received(:close_experiment) do |args|
+        expect(args[:experiment_id]).to eq("exp-1")
+        expect(args[:tenant_id]).to be_nil
         expect(args[:end_time]).to be_a(String)
       end
     end
@@ -133,6 +176,7 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
   describe "evaluator support" do
     before do
       allow(Langsmith::Context).to receive(:evaluation_root_run_id).and_return("run-abc")
+      allow(Langsmith::Context).to receive(:evaluation_root_run_tenant_id).and_return(nil)
       allow(client).to receive(:read_run)
         .and_return({ id: "run-abc", inputs: { q: "hi" }, outputs: { a: "bye" }, total_tokens: 10 })
       allow(client).to receive(:create_feedback)
@@ -173,10 +217,10 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       run_with_evaluators(evaluators)
 
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "correctness", score: 0.9, value: nil, comment: nil
+        run_id: "run-abc", key: "correctness", score: 0.9, value: nil, comment: nil, tenant_id: nil
       ).at_least(:once)
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "relevance", score: 0.8, value: nil, comment: nil
+        run_id: "run-abc", key: "relevance", score: 0.8, value: nil, comment: nil, tenant_id: nil
       ).at_least(:once)
     end
 
@@ -184,7 +228,7 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       run_with_evaluators({ metric: ->(**_kwargs) { 0.75 } })
 
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "metric", score: 0.75, value: nil, comment: nil
+        run_id: "run-abc", key: "metric", score: 0.75, value: nil, comment: nil, tenant_id: nil
       ).at_least(:once)
     end
 
@@ -192,7 +236,7 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       run_with_evaluators({ metric: ->(**_kwargs) { true } })
 
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "metric", score: 1.0, value: nil, comment: nil
+        run_id: "run-abc", key: "metric", score: 1.0, value: nil, comment: nil, tenant_id: nil
       ).at_least(:once)
     end
 
@@ -200,7 +244,7 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       run_with_evaluators({ metric: ->(**_kwargs) { false } })
 
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "metric", score: 0.0, value: nil, comment: nil
+        run_id: "run-abc", key: "metric", score: 0.0, value: nil, comment: nil, tenant_id: nil
       ).at_least(:once)
     end
 
@@ -210,7 +254,7 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       run_with_evaluators({ metric: evaluator })
 
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "metric", score: 0.5, value: "partial", comment: "half right"
+        run_id: "run-abc", key: "metric", score: 0.5, value: "partial", comment: "half right", tenant_id: nil
       ).at_least(:once)
     end
 
@@ -227,7 +271,34 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
       run_with_evaluators({ bad_eval: bad, good_eval: good })
 
       expect(client).to have_received(:create_feedback).with(
-        run_id: "run-abc", key: "good_eval", score: 1.0, value: nil, comment: nil
+        run_id: "run-abc", key: "good_eval", score: 1.0, value: nil, comment: nil, tenant_id: nil
+      ).at_least(:once)
+    end
+
+    it "uses evaluation root run tenant for read_run and feedback" do
+      allow(Langsmith::Context).to receive(:evaluation_root_run_tenant_id).and_return("run-tenant")
+
+      run_with_evaluators({ metric: ->(**_kwargs) { 1.0 } })
+
+      expect(client).to have_received(:read_run).with(run_id: "run-abc", tenant_id: "run-tenant").at_least(:once)
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "metric", score: 1.0, value: nil, comment: nil, tenant_id: "run-tenant"
+      ).at_least(:once)
+    end
+
+    it "falls back to runner tenant for read_run and feedback when root run tenant is nil" do
+      runner_tenant_id = "tenant-123"
+      evaluator = ->(**_kwargs) { 1.0 }
+      described_class.new(
+        dataset_id: dataset_id,
+        experiment_name: experiment_name,
+        tenant_id: runner_tenant_id,
+        evaluators: { metric: evaluator }
+      ) { |_example| { answer: "result" } }.run
+
+      expect(client).to have_received(:read_run).with(run_id: "run-abc", tenant_id: runner_tenant_id).at_least(:once)
+      expect(client).to have_received(:create_feedback).with(
+        run_id: "run-abc", key: "metric", score: 1.0, value: nil, comment: nil, tenant_id: runner_tenant_id
       ).at_least(:once)
     end
 
@@ -268,6 +339,51 @@ RSpec.describe Langsmith::Evaluation::ExperimentRunner do
 
       expect(client).not_to have_received(:create_feedback)
       expect(result[:results].first[:status]).to eq(:error)
+    end
+  end
+
+  describe "tenant routing precedence with traced runs" do
+    before do
+      allow(client).to receive(:read_run).and_return({ id: "run-from-api", inputs: {}, outputs: {} })
+      allow(client).to receive(:create_feedback)
+    end
+
+    after do
+      Langsmith.configuration.tenant_id = nil
+    end
+
+    it "prefers root run tenant over runner and configured tenants" do
+      Langsmith.configuration.tenant_id = "configured-tenant"
+
+      described_class.new(
+        dataset_id: dataset_id,
+        experiment_name: experiment_name,
+        tenant_id: "runner-tenant",
+        evaluators: { metric: ->(**_kwargs) { 1.0 } }
+      ) do |_example|
+        Langsmith.trace("eval-run", tenant_id: "trace-tenant") { { answer: "ok" } }
+      end.run
+
+      expect(client).to have_received(:read_run).with(hash_including(tenant_id: "trace-tenant")).at_least(:once)
+      expect(client).to have_received(:create_feedback).with(
+        hash_including(key: "metric", tenant_id: "trace-tenant")
+      ).at_least(:once)
+    end
+
+    it "falls back to runner tenant when traced root tenant is nil" do
+      described_class.new(
+        dataset_id: dataset_id,
+        experiment_name: experiment_name,
+        tenant_id: "runner-tenant",
+        evaluators: { metric: ->(**_kwargs) { 1.0 } }
+      ) do |_example|
+        Langsmith.trace("eval-run") { { answer: "ok" } }
+      end.run
+
+      expect(client).to have_received(:read_run).with(hash_including(tenant_id: "runner-tenant")).at_least(:once)
+      expect(client).to have_received(:create_feedback).with(
+        hash_including(key: "metric", tenant_id: "runner-tenant")
+      ).at_least(:once)
     end
   end
 end

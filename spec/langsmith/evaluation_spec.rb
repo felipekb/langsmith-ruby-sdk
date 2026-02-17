@@ -18,6 +18,7 @@ RSpec.describe Langsmith::Evaluation do
         description: nil,
         metadata: nil,
         evaluators: {},
+        tenant_id: nil,
         &block
       )
     end
@@ -33,6 +34,21 @@ RSpec.describe Langsmith::Evaluation do
         description: nil,
         metadata: nil,
         evaluators: evaluators,
+        tenant_id: nil,
+        &block
+      )
+    end
+
+    it "forwards tenant_id to ExperimentRunner" do
+      described_class.run(dataset_id: "ds-1", experiment_name: "test", tenant_id: "tenant-123", &block)
+
+      expect(Langsmith::Evaluation::ExperimentRunner).to have_received(:new).with(
+        dataset_id: "ds-1",
+        experiment_name: "test",
+        description: nil,
+        metadata: nil,
+        evaluators: {},
+        tenant_id: "tenant-123",
         &block
       )
     end

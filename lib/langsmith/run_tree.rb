@@ -140,7 +140,10 @@ module Langsmith
     # attach feedback to it later. Only root runs (no parent) register;
     # child runs must not overwrite.
     def register_evaluation_root_run(effective_parent_id)
-      Context.set_evaluation_root_run_id(@run.id) if effective_parent_id.nil? && Context.evaluating?
+      return unless effective_parent_id.nil? && Context.evaluating?
+
+      Context.set_evaluation_root_run_id(@run.id)
+      Context.set_evaluation_root_run_tenant_id(@run.tenant_id)
     end
 
     # Sanitize block results to prevent circular references.

@@ -1,6 +1,6 @@
 # LangSmith Ruby SDK
 
-A Ruby SDK for [LangSmith](https://smith.langchain.com/) tracing and observability.
+A Ruby SDK for [LangSmith](https://smith.langchain.com/) tracing, experiments, and evaluations.
 
 ## Installation
 
@@ -164,6 +164,67 @@ Langsmith.trace("openai_call", run_type: "llm") do |run|
 end
 ```
 
+## Evaluations (Datasets + Experiments)
+
+Run your app against a LangSmith dataset and attach evaluator feedback to each traced example run:
+
+```ruby
+require "langsmith"
+
+summary = Langsmith::Evaluation.run(
+  dataset_id: "dataset-uuid",
+  experiment_name: "qa-baseline-v1",
+  description: "First baseline on FAQ dataset",
+  metadata: { model: "gpt-4", prompt_version: 3 },
+  evaluators: {
+    correctness: lambda { |outputs:, reference_outputs:, inputs:, run:|
+      predicted = outputs[:answer].to_s.strip.downcase
+      expected = reference_outputs[:answer].to_s.strip.downcase
+
+      {
+        score: predicted == expected ? 1.0 : 0.0,
+        value: predicted,
+        comment: "question=#{inputs[:question]} run_id=#{run[:id]}"
+      }
+    },
+    has_answer: ->(outputs:, **) { outputs[:answer].to_s.empty? ? 0.0 : 1.0 }
+  }
+) do |example|
+  # Wrap each dataset example in a trace so feedback can attach to the run.
+  Langsmith.trace("qa_inference", run_type: "chain", inputs: example[:inputs]) do
+    answer = MyApp.answer(example[:inputs][:question])
+    { answer: answer }
+  end
+end
+
+pp summary
+```
+
+### Evaluator Contract
+
+Each evaluator receives keyword arguments:
+- `outputs:` your block return value
+- `reference_outputs:` `example[:outputs]` from the dataset
+- `inputs:` `example[:inputs]` from the dataset
+- `run:` the LangSmith run hash for the traced example
+
+Evaluator return values:
+- `Numeric` -> used as `score`
+- `true` / `false` -> converted to `1.0` / `0.0`
+- `Hash` -> expected keys: `:score`, `:value`, `:comment`
+- `nil` -> skip feedback creation for that evaluator
+
+If one evaluator raises, the others still run. If your example block raises, the example is marked failed and the experiment continues.
+
+### Evaluation Summary
+
+`Langsmith::Evaluation.run` returns:
+- `:experiment_id`
+- `:total`
+- `:succeeded`
+- `:failed`
+- `:results` (per-example `:example_id`, `:run_id`, `:status`, `:error`, `:feedback`)
+
 ## Examples
 
 See [`examples/LLM_TRACING.md`](examples/LLM_TRACING.md) for comprehensive examples including:
@@ -175,6 +236,7 @@ See [`examples/LLM_TRACING.md`](examples/LLM_TRACING.md) for comprehensive examp
 - Error handling and retries
 - Multi-tenant tracing
 - Per-trace project overrides
+- Dataset experiments and evaluations (see section above)
 
 ## Development
 
@@ -183,4 +245,3 @@ After checking out the repo, run `bundle install` to install dependencies. Then,
 ## License
 
 The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
-
