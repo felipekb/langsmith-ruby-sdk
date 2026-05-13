@@ -243,6 +243,9 @@ module Langsmith
 
     # Convert to hash for JSON serialization to LangSmith API (full run for POST).
     # Token usage is stored in extra.metadata.usage_metadata following Python SDK pattern.
+    # User-supplied metadata (from `metadata:` / `add_metadata`) is also mirrored
+    # into `extra.metadata` so the LangSmith UI Metadata panel and Threads
+    # detection (which read from `extra.metadata`) pick it up.
     #
     # @return [Hash]
     def to_h
@@ -261,7 +264,7 @@ module Langsmith
         session_name:,
         start_time: start_time.iso8601(3),
         end_time: end_time&.iso8601(3),
-        extra: extra.empty? ? nil : extra,
+        extra: serialized_extra,
         events: events.empty? ? nil : events,
         tags: tags.empty? ? nil : tags,
         serialized: { name: },
@@ -285,7 +288,7 @@ module Langsmith
         outputs:,
         error:,
         events: events.empty? ? nil : events,
-        extra: extra.empty? ? nil : extra,
+        extra: serialized_extra,
         tags: tags.empty? ? nil : tags,
         **(metadata.empty? ? {} : { metadata: })
       }.compact
@@ -299,6 +302,20 @@ module Langsmith
     end
 
     private
+
+    # Builds the `extra` hash for serialization.
+    #
+    # The LangSmith server (and its UI / Threads detection) reads run metadata
+    # from `extra.metadata`. This mirrors user-supplied metadata (from the
+    # `metadata:` kwarg or `add_metadata`) into `extra.metadata` so it lands
+    # where the server expects, while preserving any keys already written there
+    # by `set_model`, `set_token_usage`, or `set_streaming_metrics` (those win
+    # on conflict).
+    def serialized_extra
+      result = extra.dup
+      result[:metadata] = metadata.merge(result[:metadata] || {}) unless metadata.empty?
+      result.empty? ? nil : result
+    end
 
     def validate_run_type(run_type)
       return run_type if VALID_RUN_TYPES.include?(run_type)
