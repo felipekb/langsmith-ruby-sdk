@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Mirror user-supplied `metadata` (from `Langsmith.trace(metadata:)` / `Run#add_metadata`) into `extra.metadata` during serialization. The LangSmith UI Metadata panel and Threads detection read run metadata from `extra.metadata` (Python-SDK convention); previously, user metadata was only emitted at top-level `metadata`, so it didn't appear in the UI and thread-grouping keys (`session_id` / `thread_id` / `conversation_id`) weren't detected. Top-level `metadata` is still emitted for backwards compatibility, and keys set by `set_model` / `set_token_usage` / `set_streaming_metrics` continue to win on conflict.
+
 ## [0.4.0] - 2026-02-17
 
 ### Added

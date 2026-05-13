@@ -269,6 +269,54 @@ RSpec.describe Langsmith::Run do
       expect(hash).not_to have_key(:tags)
     end
 
+    it "mirrors user-supplied metadata into extra.metadata so the LangSmith UI sees it" do
+      hash = run.to_h
+
+      expect(hash[:extra][:metadata]).to include(user_id: "123")
+    end
+
+    it "mirrors metadata added via add_metadata into extra.metadata" do
+      run.add_metadata(session_label: "checkout-flow")
+
+      hash = run.to_h
+
+      expect(hash[:extra][:metadata]).to include(user_id: "123", session_label: "checkout-flow")
+    end
+
+    it "preserves setter-written extra.metadata keys when also mirroring user metadata" do
+      run.set_model(model: "gpt-4o-mini", provider: "openai")
+
+      hash = run.to_h
+
+      expect(hash[:extra][:metadata]).to include(
+        user_id: "123",
+        ls_model_name: "gpt-4o-mini",
+        ls_provider: "openai"
+      )
+    end
+
+    it "lets setter-written keys win over user metadata on conflict" do
+      conflicting_run = described_class.new(name: "conflict_run", metadata: { ls_model_name: "user-claim" })
+      conflicting_run.set_model(model: "gpt-4o-mini", provider: "openai")
+
+      hash = conflicting_run.to_h
+
+      expect(hash[:extra][:metadata][:ls_model_name]).to eq("gpt-4o-mini")
+    end
+
+    it "still emits the top-level metadata key for backwards compatibility" do
+      hash = run.to_h
+
+      expect(hash[:metadata]).to eq({ user_id: "123" })
+    end
+
+    it "does not mutate @extra when serialized" do
+      run.to_h
+      run.to_h
+
+      expect(run.extra).to eq({})
+    end
+
     it "includes reference_example_id when set" do
       run = described_class.new(name: "test_run", reference_example_id: "example-uuid-123")
       hash = run.to_h
@@ -313,6 +361,21 @@ RSpec.describe Langsmith::Run do
       hash = run.to_update_h
 
       expect(hash).not_to have_key(:session_id)
+    end
+
+    it "mirrors user-supplied metadata into extra.metadata" do
+      run = described_class.new(name: "test_run", metadata: { user_id: "123" })
+      run.set_model(model: "gpt-4o-mini", provider: "openai")
+      run.finish(outputs: { result: "done" })
+
+      hash = run.to_update_h
+
+      expect(hash[:extra][:metadata]).to include(
+        user_id: "123",
+        ls_model_name: "gpt-4o-mini",
+        ls_provider: "openai"
+      )
+      expect(hash[:metadata]).to eq({ user_id: "123" })
     end
   end
 end
